@@ -1,4 +1,13 @@
 doc/
-CPET_SEAL/*
+CPET_SEAL/
 build/
 .vscode/
+
+py_approx_test/__pycache__/
+py_approx_test/src_approx/__pycache__/
+py_approx_test/src_helut/__pycache__/
+py_approx_test/src_remez/__pycache__/
+py_approx_test/src_errbound/__pycache__/
+py_approx_test/venv/
+py_approx_test/deprecated/
+py_approx_test/doc/
