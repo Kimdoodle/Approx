@@ -64,9 +64,9 @@ class remezData:
             else:
                 print()
         print(f"coeff: ", end='')
-        for coeff in self.coeff_log:
+        for i, coeff in enumerate(self.coeff_log):
             print(f"{len(coeff)-1}", end='')
-            if coeff != self.coeff_log[-1]:
+            if i+1 < len(self.coeff_log):
                 print(" -> ", end='')
             else:
                 print()
@@ -74,31 +74,20 @@ class remezData:
         self.total_CalData.print_params()
         print("#"*20)
     
-def remez_recursion(routes: list, data: remezData, e_num: int, max_n: int, eb: EB, approx_mode: str, printmode="debug"):
-    n = 2
+def remez_recursion(routes: list, data: remezData, e_num: int, max_n: int, eb: EB, printmode="debug"):
+    n = 3
     intervals = data.interval_log[-1]
 
     def evalF(x):
         return 1 if x >= 0.5 else 0
 
     while n <= max_n:
-        coeff, max_err, next_intervals = remez_algorithm(n, intervals, evalF, approx_mode, eb, 2, "normal")
+        if intervals[0][1] > intervals[1][0]:
+            return
+        coeff, max_err, next_intervals = remez_algorithm(n, intervals, evalF, "odd", eb, 2, "normal")
 
         pre = -int(log2(max_err))
-        if coeff == [-1]:
-            # if len(routes) == 0:
-            #     routes.append(data)
-            # elif routes[0].pre_log[-1] < data.pre_log[-1]:
-            #     routes[:] = [data]
-            # elif routes[0].pre_log[-1] == data.pre_log[-1]:
-            #     if routes[0].compare(data, eb) == -1:
-            #         routes[:] = [data]
-            break
-        if pre < 0:
-            debug_print(f"precision < 0", printmode)
-            # for cl in data.coeff_log:
-            #     debug_print(f"{cl}", printmode)
-            # debug_print(f"---------------", printmode)
+        if coeff == [-1] or pre < 0:
             break
         
         debug_print(f"n={n}, pre {pre}, step {len(data.coeff_log) + 1}, intervals: ", printmode, "")
@@ -113,33 +102,35 @@ def remez_recursion(routes: list, data: remezData, e_num: int, max_n: int, eb: E
             routes.append(newData)
             return
         
-        # 정밀도가 목표의 2/3이상 도달한 경우 Cleanse 고려
-        if pre >= e_num * (2/3):
-            newData_cl = newData
-            for iter in range(3):
-                max_err, next_intervals = cleanse(eb, next_intervals)
-                pre = -int(log2(max_err))
+        # Cleanse 고려 - 최대 2번
+        newData_cl = newData
+        for iter in range(2):
+            max_err_cl, next_intervals_cl = cleanse(eb, next_intervals)
+            pre_cl = -int(log2(max_err_cl))
+            if pre >= pre_cl:
+                break
+            else:
+                max_err = max_err_cl
+                pre = pre_cl
+                next_intervals = next_intervals_cl
 
-                debug_print(f"n={n}, pre {pre}, step {len(data.coeff_log) + 1} +  cleanse {iter+1}\n \t\tintervals: ", printmode, "")
-                if printmode == "debug":
-                    print_intervals(next_intervals, 10)
+            debug_print(f"n={n}, pre {pre}, step {len(data.coeff_log) + 1} +  cleanse {iter+1}\n \t\tintervals: ", printmode, "")
+            if printmode == "debug":
+                print_intervals(next_intervals, 10)
 
-                newData_cl = copy.deepcopy(newData_cl)
-                newData_cl.update([0, 0, 3, -2], pre, next_intervals)
-                newData_cl.iter_cleanse += 1
-                if pre >= e_num:
-                    routes.append(newData_cl)
-                    return
+            newData_cl = copy.deepcopy(newData_cl)
+            newData_cl.update([0, 0, 3, -2], pre, next_intervals)
+            newData_cl.iter_cleanse += 1
+            if pre >= e_num:
+                routes.append(newData_cl)
+                return
                 
-        remez_recursion(routes, newData, e_num, max_n, eb, approx_mode, printmode) # 새 객체가 정확도 조건을 만족할 때까지 재귀
+        remez_recursion(routes, newData, e_num, max_n, eb, printmode) # 새 객체가 정확도 조건을 만족할 때까지 재귀
 
-        if approx_mode == "all":
-            n += 1
-        elif approx_mode == "even":
-            n += 2
+        n += 2
     return
 
-def multi_remez(p_num: int, e_num: int,max_n: int, eb: EB, approx_mode: str, printmode: str):    
+def multi_remez(p_num: int, e_num: int,max_n: int, eb: EB, printmode: str):    
     p = pow(2, p_num)
     e = eb.Bc/eb.scale    
     intervals = [[0, e], [(1-e), (p-1+e)]]   
@@ -152,9 +143,11 @@ def multi_remez(p_num: int, e_num: int,max_n: int, eb: EB, approx_mode: str, pri
         
     # 첫구간 remez 수행 후 재귀
     for n in range(2, max_n+1, 2):
-        coeff, max_err, next_intervals = remez_algorithm(n, intervals, evalF, approx_mode, eb, 2, "normal")
+        coeff, max_err, next_intervals = remez_algorithm(n, intervals, evalF, "even", eb, 2, "normal")
         pre = -int(log2(max_err))
-
+        if max_err == 99:
+            debug_print(f"Init approximation n={n} failed.", printmode)
+            continue
         debug_print(f"Init approximation\nn={n}, step 0, intervals: ", printmode, "")
         if printmode == "debug":
             print_intervals(next_intervals, 10)
@@ -163,10 +156,10 @@ def multi_remez(p_num: int, e_num: int,max_n: int, eb: EB, approx_mode: str, pri
         data = remezData(intervals)
         data.update(coeff, pre, next_intervals)
 
-        # 재귀
-        remez_recursion(routes, data, e_num, max_n, eb, approx_mode, printmode)
+        # 재귀 - 홀수차로 진행
+        remez_recursion(routes, data, e_num, max_n, eb, printmode)
     
-    if routes[0].pre_log[-1] >= e_num: # 성공
+    if len(routes) > 0 and routes[0].pre_log[-1] >= e_num: # 성공
         print(f"Total {len(routes)} routes.")
 
         # 최종 비교
@@ -181,15 +174,16 @@ def multi_remez(p_num: int, e_num: int,max_n: int, eb: EB, approx_mode: str, pri
                 bob.append(route)
 
         # 텍스트파일 저장
-        # for i in range(len(bob)):
-        with open(f"coeff_{p_num}_{e_num}.txt", "w", encoding="utf-8") as f:
+        with open(f"doc/coeff_{p_num}_{e_num}.txt", "w", encoding="utf-8") as f:
             for coeff in bob[-1].coeff_log:
                 f.write(coeff2txt(coeff))
                 f.write('\n')
         
         print(f"(p, e): {p_num}, {e_num}")
+        # for b in bob:
+            # b.print_params()
         bob[-1].print_params()
-    
+
     else: # 실패
         print("Approximation Failed.")
-        routes[0].print_params()
+        # routes[0].print_params()

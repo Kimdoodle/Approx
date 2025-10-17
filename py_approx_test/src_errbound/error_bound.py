@@ -22,47 +22,31 @@ class EB:
     def cal_bound(self, m: float, coeff: list, err_mode: int) -> float:
         max_deg = len(coeff) - 1
         a = abs(coeff[max_deg])
-        if err_mode == 1:
-            if max_deg == 2:
-                err = a * B_2(m, self.Bc, self.Bs) + self.Bs
-            elif max_deg == 4:
-                b = abs(coeff[max_deg - 2])
-                err = (
-                    (2 * a * pow(m, 3) * self.Bc)
-                    + (2 * b * m * self.Bc)
-                    + (a * pow(m, 2) * self.Bs)
-                    + (2 * a * pow(m, 3) * self.Bc)
-                    + ((a + 1) * pow(m, 2) * self.Bs)
-                    + self.Bs
-                )
-            elif max_deg == 6:
-                raise NotImplementedError("cal_bound case for degree 6 is not implemented.")
-            else:
-                raise ValueError("Unsupported maximum degree.")
 
-        elif err_mode == 2:
+        if max_deg % 2 == 0: # 짝수차 함수
             if max_deg == 2:
                 err = self.Bs * (a + 1)
             elif max_deg == 4:
                 B2 = self.Bs * (a + 1)
                 b = abs(coeff[max_deg - 2])
                 err = B2 * pow(m, 2) + self.Bs * (a * pow(m, 2) + b + 1)
-                # err = (
-                #     (a + 1) * self.Bs * pow(m, 2)
-                #     # + (1 / self.scale) * (a + 1) * pow(self.Bs, 2)
-                #     + self.Bs
-                # )
             elif max_deg == 6:
                 B2 = self.Bs * (a + 1)
                 b = abs(coeff[max_deg - 2])
                 B4 = B2 * pow(m, 2) + self.Bs * (a * pow(m, 2) + b + 1)
                 c = abs(coeff[max_deg - 4])
                 err = B4 * pow(m, 2) + (a * pow(m, 4) + b * pow(m, 2) + c + 1)
-                # err = (
-                #     (a + 1) * self.Bs * pow(m, 4)
-                #     + pow(m, 2) * self.Bs
-                #     + self.Bs
-                # )
+        else: # 홀수차 함수
+            if max_deg == 1:
+                err = self.Bs
+            elif max_deg == 3:
+                B2 = self.Bs * (a + 1)
+                err = m * B2 + self.Bs
+            elif max_deg == 5:
+                B2 = self.Bs * (a + 1)
+                B3 = m * B2 + self.Bs
+                err = m * B3 + self.Bs
+                
         return err
     
     def cal_bound_cleanse(self, m: float) -> float:

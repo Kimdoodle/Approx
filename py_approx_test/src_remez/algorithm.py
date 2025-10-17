@@ -8,8 +8,7 @@ import sympy as sp
 from numpy.polynomial import polynomial as P
 from src_errbound.error_bound import EB
 
-# remez1 - errbound 계산에 초기 B_clean을 고려함
-# remez2 - errbound 계산에 B_scale만을 고려함
+# errbound 계산에 B_scale만을 고려함
 def remez_algorithm(n: int, intervals: list, evalF, approx_mode: str, eb: EB, err_mode: int, print_mode: str) -> tuple:  
     intervals = slice_interval(approx_mode, intervals)
 
@@ -26,6 +25,9 @@ def remez_algorithm(n: int, intervals: list, evalF, approx_mode: str, eb: EB, er
         # 2: 행렬식 구성
         if approx_mode == "even":
             powers = [i for i in range(n % 2, n + 1, 2)]
+        elif approx_mode == "odd": # 상수항을 포함하여 구성
+            powers = [i for i in range(n % 2, n + 1, 2)]
+            # powers.insert(0, 0)
         elif approx_mode == "all":
             powers = [i for i in range(n+1)]
         A_matrix, y_matrix = create_matrix(powers, x_samples, evalF)
@@ -112,7 +114,7 @@ def remez_algorithm(n: int, intervals: list, evalF, approx_mode: str, eb: EB, er
             
             except Exception as e:
                 print("구간 계산 오류")
-                print(intervals)
+                # print(intervals)
                 print(e)
                 return [-1], 99, []
 
@@ -127,7 +129,7 @@ def remez_algorithm(n: int, intervals: list, evalF, approx_mode: str, eb: EB, er
 
 def cleanse(eb: EB, intervals: list[list[float]]):
     def evalF(x):
-        return 1 if x >= 0.5 else 0
+        return 1 if x >= intervals[1][0] else 0
     
     def evalP(x):
         return -2 * pow(x, 3) + 3 * pow(x, 2)

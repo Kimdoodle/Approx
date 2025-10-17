@@ -1,6 +1,7 @@
 import numpy as np
 from math import log2
 from .print import debug_print
+from scipy.optimize import brentq
 
 ''' 기타 필요한 함수들 '''
 # 다항함수 평가
@@ -60,152 +61,59 @@ def sample_points_multi(m, intervals, print_mode) -> np.ndarray:
     x.sort()
     return x
 
-def generate_points(start: np.float64, end: np.float64, step=np.float64(1e-8)):
+def generate_points(start: np.float64, end: np.float64, step=np.float64(1e-10)):
+    if start == end:
+        return np.array([np.float64(start)], dtype=np.float64)
+
     max_points = 10000  # 최대 허용 포인트 수
     step = np.float64(step)
 
     while True:
-        p = np.arange(start, end + step, step, dtype=np.float64)
-        if p.size <= max_points:
-            return p
+        # 예상되는 포인트 개수 (양 끝 포함)
+        size_est = int(np.floor((end - start) / step)) + 1
+
+        # 포인트 개수가 허용 범위 내면 실제 생성
+        if size_est <= max_points:
+            # 직접 계산 (누적오차 방지)
+            points = start + np.arange(size_est, dtype=np.float64) * step
+
+            # 마지막 점이 end보다 작으면 end를 추가하여 양 끝 포함 보장
+            if points[-1] < end:
+                points = np.append(points, end)
+            # 오차로 end를 살짝 초과한 경우 end로 클램프
+            elif points[-1] > end:
+                points[-1] = end
+
+            return points
+
+        # 초과 시 step 증가 (샘플링 간격 10배 확대)
         step *= np.float64(10.0)
-
-# def sample_points_multi(m, intervals, print_mode) -> np.ndarray:
-#     """
-#     구간 비율에 따라 총 m개의 점을 여러 구간에 분배하여 샘플링합니다.
-#     - 각 구간마다 최소 1개 이상 샘플링하도록 설계되어 있으므로 m >= len(intervals) 이어야 합니다.
-#     - 모든 구간은 (start < end) 를 만족해야 합니다.
-#     - intervals 는 비어있을 수 없습니다.
-#     """
-#     # === 입력/전제 조건 검증 ===
-#     # m 타입/값 검증
-#     if not isinstance(m, (int, np.integer)):
-#         raise TypeError(f"'m' must be an integer, got {type(m).__name__}")
-#     if m < 0:
-#         raise ValueError(f"'m' must be >= 0, got {m}")
-
-#     # intervals 검증 (비어있음, 구조/타입, start<end)
-#     if not intervals:
-#         raise ValueError("'intervals' must not be empty.")
-
-#     try:
-#         lengths = np.array([float(end) - float(start) for start, end in intervals], dtype=float)
-#     except Exception as e:
-#         raise TypeError("'intervals' must be an iterable of (start, end) numeric pairs.") from e
-
-#     if lengths.ndim != 1 or lengths.size != len(intervals):
-#         raise ValueError("'intervals' must be a flat list of (start, end) pairs.")
-
-#     # 각 구간 길이 유효성: 반드시 양수
-#     if np.any(~np.isfinite(lengths)):
-#         raise ValueError("Interval bounds must be finite numbers.")
-#     if np.any(lengths <= 0):
-#         bad_idxs = np.where(lengths <= 0)[0].tolist()
-#         raise ValueError(f"All intervals must satisfy end > start. Invalid indices: {bad_idxs},\n intervals: {intervals}")
-
-#     # 총 길이 검증
-#     total_length = float(lengths.sum())
-#     if not np.isfinite(total_length) or total_length <= 0:
-#         raise ValueError("Sum of interval lengths must be positive.")
-
-#     n = len(intervals)
-
-#     # 분배 설계상 각 구간에 최소 1개 배정 -> m은 구간 수 이상이어야 함
-#     if m < n:
-#         raise ValueError(f"'m' must be at least the number of intervals ({n}), got {m}")
-
-#     # === 분배 계산 ===
-#     # 각 구간에 최소 1개 할당 후 남은 개수를 길이 비율로 배분
-#     m_alloc = np.ones(n, dtype=int)
-#     left = m - n  # 남은 개수 (>= 0 보장)
-
-#     # 비율 배분 (부동소수점 -> 내림)
-#     m_float = left * (lengths / total_length)  # total_length > 0 보장
-#     if not np.all(np.isfinite(m_float)):
-#         raise RuntimeError("Internal error: non-finite allocation encountered.")
-
-#     additional = np.floor(m_float).astype(int)
-#     m_alloc += additional
-
-#     # 내림으로 인해 남는 잔여 개수 재분배 (긴 구간부터)
-#     remainder = int(m - int(m_alloc.sum()))
-#     if remainder > 0:
-#         idx_desc = np.argsort(-lengths)  # 길이 내림차순 인덱스
-#         for idx in idx_desc[:remainder]:
-#             m_alloc[idx] += 1
-
-#     # === 구간별 샘플링 ===
-#     chunks = []
-#     for (s, e), num in zip(intervals, m_alloc):
-#         debug_print(f"sample {num} points in interval[{s}, {e}]", print_mode)
-#         if num > 0:
-#             # sample_points(s, e, num) 은 외부에 정의되어 있다고 가정
-#             chunks.append(sample_points(float(s), float(e), int(num)))
-
-#     # 모든 배정이 0인 경우는 위의 검증/분배상 발생하지 않지만, 방어적 처리
-#     if not chunks:
-#         return np.array([], dtype=float)
-
-#     x = np.concatenate(chunks)
-#     x.sort()
-#     return x
 
 # 구간 [a, b]에서 f(x)-p(x)의 근을 계산
 def find_intersection(coeff, evalF, a, b) -> list:
-    # num_points = int((b - a) * 10000)
-    # x_points = np.linspace(a, b, num_points)
     x_points = generate_points(a, b)
-    p_vals = np.fromiter((evalP(coeff, x) for x in x_points), dtype=np.float64)
-    f_vals = np.fromiter((evalF(x) for x in x_points), dtype=np.float64)
-    # p_vals = np.array([evalP(coeff, x) for x in x_points])
-    # f_vals = np.array([evalF(x) for x in x_points])
-    errors = p_vals - f_vals
-    signs = np.sign(errors)
-    x_cross = []
-
-    # 4) 정확히 0인 지점
-    zero_idx = np.nonzero(errors == np.float64(0.0))[0]
-    if zero_idx.size > 0:
-        x_cross.extend(x_points[zero_idx].tolist())
-
-    # 5) 인접한 포인트 간 부호 변화 구간
-    change_idx = np.nonzero(signs[:-1] * signs[1:] < 0)[0]
-    if change_idx.size > 0:
-        x0 = x_points[change_idx]
-        x1 = x_points[change_idx + 1]
-        e0 = errors[change_idx]
-        e1 = errors[change_idx + 1]
-
-        denom = e1 - e0
-        # 분모가 0인 경우 대비
-        mask = denom != np.float64(0.0)
-
-        # 선형보간 근
-        x_root_lin = x0 - e0 * (x1 - x0) / denom
-        # 분모 0이면 중간값 사용
-        x_root_mid = (x0 + x1) / np.float64(2.0)
-
-        x_roots = np.where(mask, x_root_lin, x_root_mid)
-        x_cross.extend(x_roots.tolist())
-
-    return x_cross
-    # for i in range(len(x_points) - 1):
-    #     if errors[i] == 0: # 정확히 0
-    #         x_cross.append(x_points[i])
-    #     elif signs[i] * signs[i + 1] < 0:
-    #         x0, x1 = x_points[i], x_points[i + 1]
-    #         err0, err1 = errors[i], errors[i + 1]
-
-    #         if err1 - err0 != 0:
-    #             x_root = x0 - err0 * (x1 - x0) / (err1 - err0)
-    #         else:
-    #             x_root = (x0 + x1) / 2
-    #         x_cross.append(x_root)
-    # return x_cross
+    roots = []
+    for i in range(len(x_points) - 1):
+        x1, x2 = x_points[i], x_points[i+1]
+        y1 = evalP(coeff, x1) - evalF(x1)
+        y2 = evalP(coeff, x2) - evalF(x2)
+        
+        if y1 == 0:
+            roots.append(x1)
+        elif y2 == 0:
+            roots.append(x2)
+        elif y1 * y2 < 0:
+            try:
+                root = brentq(lambda x: evalP(coeff, x) - evalF(x), x1, x2)
+                roots.append(root)
+            except ValueError as e:
+                print("Find Intersection ERR!!")
+                print(e)
+    return roots
 
 # 구간 변경
 def slice_interval(approx_mode: str, intervals: list) -> list:
-    if approx_mode == "all":
+    if approx_mode in ["all"]:
         return intervals
     
     # 기존 구간 intervals 정렬
@@ -277,14 +185,17 @@ def calculate_local_max(coeff, evalF, intervals: list) -> tuple:
                 cross_interval.append((roots[i], roots[i+1]))
 
     for start, end in cross_interval:
-        # local_x = np.linspace(start, end, 1000)
-        local_x = generate_points(start, end)
-        local_y = [error_abs(coeff, x, evalF(x)) for x in local_x]
-        max_index = np.argmax(local_y)
-        max_x = local_x[max_index]
-        max_y = local_y[max_index]
-        max_point_x.append(max_x)
-        max_point_y.append(max_y)
+        try:
+            # local_x = np.linspace(start, end, 1000)
+            local_x = generate_points(start, end)
+            local_y = [error_abs(coeff, x, evalF(x)) for x in local_x]
+            max_index = np.argmax(local_y)
+            max_x = local_x[max_index]
+            max_y = local_y[max_index]
+            max_point_x.append(max_x)
+            max_point_y.append(max_y)
+        except Exception as e:
+            pass
     
     return max_point_x, max_point_y
 
@@ -320,21 +231,19 @@ def calculate_next_remez(coeff, evalF, eb, intervals, err_mode: int):
             max_err = max(val1, max_err)
         else:
             points = generate_points(start, end)
-            # length = abs(end - start)
-            # # 적절한 간격으로 샘플링, 오차 계산
-            # num_points = int(np.clip(np.ceil(length / 1e-3), 50, 2000))
-            # points = np.linspace(start, end, num_points)
-            
-            p_vals1      = np.fromiter((evalP(coeff, p) + eb.cal_bound(p, coeff, err_mode)/eb.scale for p in points), dtype=float, count=points.size)
-            p_vals2      = np.fromiter((evalP(coeff, p) - eb.cal_bound(p, coeff, err_mode)/eb.scale for p in points), dtype=float, count=points.size)
-            f_vals      = np.fromiter((evalF(p) for p in points), dtype=float, count=points.size)
+            try:
+                p_vals1      = np.fromiter((evalP(coeff, p) + eb.cal_bound(p, coeff, err_mode)/eb.scale for p in points), dtype=float, count=points.size)
+                p_vals2      = np.fromiter((evalP(coeff, p) - eb.cal_bound(p, coeff, err_mode)/eb.scale for p in points), dtype=float, count=points.size)
+                f_vals      = np.fromiter((evalF(p) for p in points), dtype=float, count=points.size)
 
-            err_vals = np.concatenate((np.abs(f_vals - p_vals1), np.abs(f_vals - p_vals2)))
-            vals = np.concatenate((p_vals1, p_vals2))
-            ni.append([np.min(vals), np.max(vals)])
-            
-            # 최대오차
-            max_err = max(np.max(err_vals), max_err)
+                err_vals = np.concatenate((np.abs(f_vals - p_vals1), np.abs(f_vals - p_vals2)))
+                vals = np.concatenate((p_vals1, p_vals2))
+                ni.append([np.min(vals), np.max(vals)])
+                
+                # 최대오차
+                max_err = max(np.max(err_vals), max_err)
+            except Exception as e:
+                print(e)
     
     # 정렬 - 구간이 긴 쪽이 다음 근사에서 0으로 수렴해야함
     if (ni[0][1]-ni[0][0]) < (ni[1][1]-ni[1][0]):

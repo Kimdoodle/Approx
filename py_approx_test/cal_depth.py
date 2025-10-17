@@ -75,24 +75,35 @@ def cal_iter(coeff: list[float], iter: int) -> CalData:
     res.add_count *= iter
     res.ct_mult_count *= iter
     res.pt_mult_count *= iter
-
     return res
 
-
 # 특정 함수의 연산량, 깊이 계산
-def cal_coeff(coeff: list[float]) -> CalData:
+def cal_coeff(coeff: list[float]) -> CalData:        
     # 함수가 홀수/짝수/전체인지 확인
     coeff_type = detect_coeff_type(coeff)
     res = CalData()
     max_deg = len(coeff) - 1
 
+    # cleanse용
+    if coeff == [0, 0, 3, -2]:
+        res.ct_mult_count = 2
+        res.add_count = 1
+        res.pt_mult_count = 2
+        res.depth = 2
+        return res
     if coeff_type == "all":
         res.ct_mult_count = max_deg - 1
         res.add_count = max_deg
+        res.depth = res.ct_mult_count + 1
     elif coeff_type == "even":
         res.ct_mult_count = int(max_deg / 2)
         res.add_count = int(max_deg / 2)
+        res.depth = res.ct_mult_count + 1
+    elif coeff_type == "odd":
+        res.ct_mult_count = int(max_deg / 2) + 1
+        res.add_count = int(max_deg / 2)
+        res.depth = res.ct_mult_count
 
     res.pt_mult_count = 1
-    res.depth = res.ct_mult_count + 1
+
     return res
