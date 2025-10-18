@@ -54,7 +54,7 @@ HELUT_Info parse_helut(int p_num, int e_num) {
 
 MR_Info parse_remez_coeff(int p_num, int e_num, bool parse_s, bool print)
 {
-    int s_val = 0;  // "-2x^3+3x^2"가 포함된 줄의 개수
+    int s_val = 0;  // "+3x^2-2x^3"가 포함된 줄의 개수
     int n_val = 0;  // 전체 줄 개수
 
     // 1) coeff 파일명을 (p,e)로 구성
@@ -76,14 +76,14 @@ MR_Info parse_remez_coeff(int p_num, int e_num, bool parse_s, bool print)
         R"((\d+))"                                            // exponent (그룹2)
     );
 
-    // s 계산용 패턴: "-2x^3+3x^2" (공백 가변 허용)
-    const std::regex s_re(R"(-\s*2\s*x\^3\s*\+\s*3\s*x\^2)");
+    // s 계산용 패턴: "+3x^2-2x^3" (공백 가변 허용, 앞 '+'는 선택)
+    const std::regex s_re(R"((?:\+)?\s*3\s*x\^2\s*-\s*2\s*x\^3)");
 
     // 파일 순회
     while (std::getline(infile, line)) {
         ++n_val;  // 줄 개수 증가
 
-        // parse_s가 true인 경우 "-2x^3+3x^2" 포함 여부 확인
+        // parse_s가 true인 경우 "+3x^2-2x^3" 포함 여부 확인
         if (parse_s && std::regex_search(line, s_re)) {
             ++s_val;
         }
@@ -140,7 +140,7 @@ MR_Info parse_remez_coeff(int p_num, int e_num, bool parse_s, bool print)
     // 4) MR_Info 채우기
     mi.coeffs = std::move(result);
     mi.n = n_val;   // 읽은 줄 수
-    mi.s = s_val;   // "-2x^3+3x^2"가 포함된 줄 수
+    mi.s = s_val;   // "+3x^2-2x^3"가 포함된 줄 수
 
     return mi;
 }

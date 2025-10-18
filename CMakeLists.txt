@@ -18,7 +18,7 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 endif()
 
-set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/CPET_SEAL/install/lib/cmake/SEAL-4.1")
+set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/CPET_SEAL/Release/lib/cmake/SEAL-4.1")
 
 find_package(SEAL 4.1 REQUIRED)
 target_link_libraries(${PROJECT_NAME} SEAL::seal)

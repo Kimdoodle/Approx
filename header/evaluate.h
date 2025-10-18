@@ -11,11 +11,14 @@ void evaluate_helut(CKKS_params& pms, HELUT_Info& hi, double e, double p, bool m
 void evaluate_multi_remez(CKKS_params& pms, MR_Info& entries, double e, double p, bool mid_print, bool res_print);
 
 Ciphertext evaluate_func(CKKS_params& pms, vector<double> coeff, Ciphertext& x);
-Ciphertext evaluate_func_even(CKKS_params& pms, vector<double> coeff, double scale, Ciphertext& x, bool correct_factor);
-Ciphertext eval(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x);
+// Ciphertext evaluate_func_even(CKKS_params& pms, vector<double> coeff, double scale, Ciphertext& x, bool correct_factor);
+Ciphertext eval_even(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x);
+Ciphertext eval_odd(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x);
 vector<double> calculate_correction_factor(CKKS_params& pms, vector<double> coeff, Ciphertext& x);
+vector<double> calculate_correction_factor_odd(CKKS_params& pms, vector<double> coeff, Ciphertext& x);
 double calculate_cleanse_correction_factor(CKKS_params& pms, Ciphertext& x);
 Ciphertext cleanse(CKKS_params& pms, Ciphertext& x);
+int check_coeff_type(vector<double> coeff);
 int evaluate_depth(vector<double> coeff, bool include_plain);
 
 std::vector<double> linspace(double a, double b, std::size_t n);

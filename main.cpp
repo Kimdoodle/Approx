@@ -4,7 +4,7 @@
 
 int main()
 {
-    int p_num = 3;
+    int p_num = 2;
     int e_num = 30;
     int s_num = 50;
     int N_num = 17;
@@ -14,7 +14,8 @@ int main()
     int N = pow(2, N_num);
     EB eb = EB(sigma, N, hwt);
 
-    test_base(p_num, s_num, e_num, N_num, hwt, false, true, true, true);
+    for(p_num=2; p_num<=10; p_num++)
+        test_base(p_num, s_num, e_num, N_num, hwt, false, true, true, true);
     // test_cleanse_s(p_num, e_num, s_num);
     // test_time(p_num, e_num, s_num, true, true);
     // vector<double> coeff = {0.6804462163512842, 0.0, -0.4010128038041, 0.0, 0.040100790861333446};

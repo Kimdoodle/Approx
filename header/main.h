@@ -36,8 +36,11 @@ void test_base(int p_num, int s_num, int e_num, int N, size_t hwt, bool test_hel
     if(test_remez)
     {
         mi = parse_remez_coeff(p_num, e_num, true, false);
-        for(vector<double> coeff: mi.coeffs)
+        for(int i=0; i<mi.n - mi.s; i++)
+        {
+            vector<double> coeff = mi.coeffs[i];
             remez_level += evaluate_depth(coeff, true);
+        }           
         remez_level += (2 * mi.s);
     }
     req_depth = helut_level > remez_level ? helut_level : remez_level;
@@ -82,6 +85,7 @@ void test_base(int p_num, int s_num, int e_num, int N, size_t hwt, bool test_hel
 
 
 // remez - 필요한 Cleanse 횟수 계산
+/*
 void test_cleanse_s(int p_num, int e_num, int s_num)
 {
     int pre_num = e_num;
@@ -144,7 +148,7 @@ void test_cleanse_s(int p_num, int e_num, int s_num)
     }
     // std::cout << "##################################" << std::endl;
 }
-
+*/
 
 // 시간 측정
 void test_time(int p_num, int e_num, int s_num, bool test_helut, bool test_remez)
@@ -162,6 +166,7 @@ void test_time(int p_num, int e_num, int s_num, bool test_helut, bool test_remez
 
 
 // err bound 측정
+/*
 void test_err(EB eb, vector<double> coeff, int p_num, int e_num, int s_num, int N_num, int hwt)
 {
     // 기본 파라미터 설정
@@ -207,3 +212,4 @@ void test_err(EB eb, vector<double> coeff, int p_num, int e_num, int s_num, int 
     }
     cout << "------------\n";
 }
+*/

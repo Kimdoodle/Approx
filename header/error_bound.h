@@ -30,6 +30,7 @@ public:
                 return (2 * a * pow(m, 3) * Bc) + (2 * b * m * Bc) + (a * pow(m, 2) * Bs) + (2 * a * pow(m, 3) * Bc) + ((a+1) * pow(m, 2) * Bs) + Bs;
                 break;
             case 6:
+                return 0.0;
                 break;
         }
     }

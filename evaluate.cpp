@@ -124,30 +124,48 @@ void evaluate_multi_remez(CKKS_params& pms, MR_Info& mi, double e, double p, boo
 
     Ciphertext ct = pms.encrypt(x);
     vector<vector<double>> coeffs = mi.coeffs;
-    vector<double> real_result, ckks_result, coeff;
+    vector<double> real_result, ckks_result, coeff, corr_factor;
 
-    // 1. coeff
-    for(int en=0; en<mi.n - mi.s; en++)
+    // 1. coeff 1차
+    coeff = coeffs[0];
+    corr_factor = calculate_correction_factor(pms, coeff, ct);
+    ct = eval_even(pms, coeff, corr_factor, ct);
+    if(res_print)
     {
-        coeff = coeffs[en];
-        vector<double> corr_factor = calculate_correction_factor(pms, coeff, ct);
-        ct = eval(pms, coeff, corr_factor, ct);
+        real_result = evaluate_function(coeff, x);
+        if(mid_print)
+        {
+            ckks_result = pms.decode_ctxt(ct);
+            cout << "Coeff Evaluation 0, degree " << coeff.size()-1 << endl;
+            // compare_result(real_result, ckks_result, "REAL", "CKKS", x.size());
+            double max_err = compare_result_log(ckks_result, x.size(), true);
+            cout << "------------\n";
+        }
+    }
+    x = real_result;
+
+    // 2. coeff 2차~
+    for(int i=1; i<mi.n - mi.s; i++)
+    {
+        coeff = coeffs[i];
+        corr_factor = calculate_correction_factor_odd(pms, coeff, ct);
+        ct = eval_odd(pms, coeff, corr_factor, ct);
         if(res_print)
         {
             real_result = evaluate_function(coeff, x);
             if(mid_print)
             {
                 ckks_result = pms.decode_ctxt(ct);
-                cout << "Coeff Evaluation " << en+1 << ", degree " << coeff.size()-1 << endl;
-                compare_result(real_result, ckks_result, "REAL", "CKKS", x.size());
-                // double max_err = compare_result_log(ckks_result, x.size(), true);
+                cout << "Coeff Evaluation " << i+1 << ", degree " << coeff.size()-1 << endl;
+                // compare_result(real_result, ckks_result, "REAL", "CKKS", x.size());
+                double max_err = compare_result_log(ckks_result, x.size(), true);
                 cout << "------------\n";
             }
         }
         x = real_result;
     }
 
-    // 2. Cleanse
+    // 3. Cleanse
     vector<double> coeff_cleanse = {0.0, 0.0, 3.0, -2.0};
     for(int i=0; i<mi.s; i++)
     {
@@ -227,6 +245,7 @@ Ciphertext evaluate_func(CKKS_params& pms, vector<double> coeff, Ciphertext& x)
 
 // 다항식 평가(짝수차 함수)
 // ex) ax^4 + bx^2 + c = ((ax^2 + b)x^2 + c)
+/*
 Ciphertext evaluate_func_even(CKKS_params& pms, vector<double> coeff, double scale, Ciphertext& x, bool correct_factor)
 {
     // for(int i=0; i<coeff.size(); i++)
@@ -293,8 +312,9 @@ Ciphertext evaluate_func_even(CKKS_params& pms, vector<double> coeff, double sca
 
     return result;
 }
+*/
 
-Ciphertext eval(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x)
+Ciphertext eval_even(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x)
 {
     int index = coeff.size() - 1;
     int cf_index = 0;
@@ -343,6 +363,70 @@ Ciphertext eval(CKKS_params& pms, vector<double> coeff, vector<double> correctio
     return result;
 }
 
+Ciphertext eval_odd(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x)
+{
+    int max_deg = coeff.size() - 1;
+    int cf_index = 0;
+    double scale = x.scale();
+
+    // 1. 최고차항의 계수가 1이 되도록 계수 재정의
+    double outer_coeff = coeff[max_deg];
+    for(int i=1; i<=max_deg; i+=2)
+        coeff[i] /= outer_coeff;
+
+    // 2. 항 계산
+    //식 형태는 (짝수차 함수) * ax
+    Plaintext pt;
+    Ciphertext x_square, temp, result;
+
+    //x^2
+    pms.eva->square(x, x_square);
+    pms.eva->relinearize_inplace(x_square, pms.rlk);
+    pms.eva->rescale_to_next_inplace(x_square);
+
+    // 첫 번째 항 = f1 * x^2 + b
+    pms.encoder->encode(1.0, x_square.parms_id(), scale * correction_factors[cf_index++], pt);
+    pms.eva->multiply_plain(x_square, pt, result);
+    pms.eva->rescale_to_next_inplace(result);
+
+    pms.encoder->encode(coeff[max_deg-2], result.parms_id(), result.scale(), pt);
+    pms.eva->add_plain_inplace(result, pt);
+
+    // cout << log2(abs(result.scale() - scale)) << endl;
+
+    // 두 번째 항부터 반복
+    for(int i=max_deg-4; i>=0; i-=2)
+    {
+        // fi * (x^2) and mod reduce
+        pms.encoder->encode(1.0, x_square.parms_id(), scale * correction_factors[cf_index++], pt);
+        pms.eva->multiply_plain(x_square, pt, temp);
+        pms.eva->rescale_to_next_inplace(temp);
+        pms.eva->mod_reduce_to_inplace(temp, result.parms_id());
+
+        // 곱하기
+        pms.eva->multiply(result, temp, result);
+        pms.eva->relinearize_inplace(result, pms.rlk);
+        pms.eva->rescale_to_next_inplace(result);
+        
+        // 더하기
+        pms.encoder->encode(coeff[i], result.parms_id(), result.scale(), pt);
+        pms.eva->add_plain_inplace(result, pt);
+    }
+
+    //마지막 항
+    pms.encoder->encode(outer_coeff, x.parms_id(), scale * correction_factors[cf_index++], pt);
+    pms.eva->multiply_plain(x, pt, temp);
+    pms.eva->rescale_to_next_inplace(temp);
+    pms.eva->mod_reduce_to_inplace(temp, result.parms_id());
+
+    pms.eva->multiply(result, temp, result);
+    pms.eva->relinearize_inplace(result, pms.rlk);
+    pms.eva->rescale_to_next_inplace(result);
+
+    result.scale() = scale;
+    return result;
+}
+
 // correction factor 계산. 짝수차 항만 존재하는 다항식에 해당.
 vector<double> calculate_correction_factor(CKKS_params& pms, vector<double> coeff, Ciphertext& x)
 {
@@ -366,6 +450,32 @@ vector<double> calculate_correction_factor(CKKS_params& pms, vector<double> coef
         // correction_factors.push_back((scale_2) / (scale * scale_prime));
     }
     return correction_factors;
+}
+
+// correction factor 계산. 홀수차 다항식용.
+vector<double> calculate_correction_factor_odd(CKKS_params& pms, vector<double> coeff, Ciphertext& x)
+{
+    const auto& coeff_modulus = pms.context->get_context_data(x.parms_id())->parms().coeff_modulus();
+    int coeff_modulus_index = coeff_modulus.size() - 1;
+    int max_deg = coeff.size() - 1;
+
+    double scale, scale_p, scale_pp, scale_ppp;
+    double f1, f2, f3;
+
+    scale = x.scale();
+    scale_p = (scale * scale) / static_cast<double_t>(coeff_modulus[coeff_modulus_index].value());
+    scale_pp = (scale_p * scale_p) / static_cast<double_t>(coeff_modulus[coeff_modulus_index-1].value());
+
+    f1 = scale_p / scale;
+    f2 = (scale_p * scale_pp) / (scale * scale);
+
+    if(max_deg > 3)
+    {
+        scale_ppp = (scale_pp * scale_pp) / static_cast<double_t>(coeff_modulus[coeff_modulus_index-2].value());
+        f3 = (scale_p * scale_ppp) / (scale * scale);
+        return {f1, f2, f3};
+    }
+    return {f1, f2};
 }
 
 double calculate_cleanse_correction_factor(CKKS_params& pms, Ciphertext& x)
@@ -420,12 +530,43 @@ Ciphertext cleanse(CKKS_params& pms, Ciphertext& x)
     return res;
 }
 
+// 다항식 타입 체크
+int check_coeff_type(vector<double> coeff)
+{
+    int max_deg = coeff.size() - 1;
+    if(max_deg % 2 == 0)
+    {
+        for(int i=1; i<=max_deg; i+=2)
+            if(coeff[i] != 0.0)
+                return 2;
+        return 0;
+    }
+    else if(max_deg % 2 == 1)
+    {
+        for(int i=0; i<=max_deg; i+=2)
+            if(coeff[i] != 0.0)
+                return 2;
+        return 1;
+    }
+    return 2;
+}
+
 int evaluate_depth(vector<double> coeff, bool include_plain)
 {
-    int depth = coeff.size()/2;
-    if(include_plain && coeff[coeff.size()-1] != 1.0)
-        ++depth;
-    return depth;
+    // 1. 다항식 타입(all, odd, even) 구별
+    int coeff_type = check_coeff_type(coeff);
+
+    // 2. 다항식 타입에 따른 depth반환
+    switch(coeff_type)
+    {
+        case 0: // 짝함수
+            return coeff.size() / 2 + 1;
+        case 1: // 홀함수
+            return coeff.size() / 2;
+        case 2: // 일반함수
+            break;
+    }
+    return -99;
 }
 
 std::vector<double> linspace(double a, double b, std::size_t n) {
