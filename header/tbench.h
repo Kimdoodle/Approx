@@ -7,5 +7,5 @@
 
 
 int find_best_pmd(int s, int depth);
-void test_helut_time(int p_num, int e_num, int s_num, bool print);
-void test_remez_time(int p_num, int e_num, int s_num, bool print);
+void test_helut_time(int p_num, int e_num, int s_num, int N_num, bool print);
+void test_remez_time(int p_num, int e_num, int s_num, int N_num, bool print);

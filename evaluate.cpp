@@ -5,28 +5,13 @@
 void evaluate_helut(CKKS_params& pms, HELUT_Info& hi, double e, double p, bool mid_print, bool res_print)
 {
     // cout << "r, s : " << hi.r << ", " << hi.s << endl;
-    vector<double> x = {0.0, e};
-    auto lin = linspace(1 - e, p-1, pms.parms->poly_modulus_degree()/2-2);
-    x.insert(x.end(), lin.begin(), lin.end());
+    vector<double> x;
+    for(int i=0; i<p; i++)
+        x.push_back(i);
     vector<double> real_result = x;
     vector<double> ckks_result;
     Ciphertext ct = pms.encrypt(x);
     Plaintext pt;
-
-    // Calculate correction factor
-    // const auto& coeff_modulus = pms.context->get_context_data(ct.parms_id())->parms().coeff_modulus();
-    // int coeff_modulus_index = coeff_modulus.size() - 1;
-    // double_t correction_factor = 1.0;
-    // double_t scale = ct.scale();
-
-    // for(int i=0; i<(2 + hi.r) + (2 * hi.s); i++)
-    // {
-    //     correction_factor *= static_cast<double_t>(coeff_modulus[coeff_modulus_index].value()) / scale;
-    //     --coeff_modulus_index;
-    // }
-    
-    // pms.encoder->encode(1.0, ct.parms_id(), correction_factor, pt);
-    // pms.eva->multiply_plain_inplace(ct, pt);
 
     // 1. SqMethod - (1-2x^2/p^2)^(2^r)
     {
@@ -54,6 +39,7 @@ void evaluate_helut(CKKS_params& pms, HELUT_Info& hi, double e, double p, bool m
                 cout << "SqMethod base result:"<<endl;
                 // compare_result(real_result, ckks_result, "REAL", "CKKS", real_result.size());
                 double max_err = compare_result_log(ckks_result, x.size(), true);
+                cout << "Remaining Levels: " << ct.coeff_modulus_size() << endl;
                 cout << "---------------------------------" << endl;
             }
         }
@@ -75,6 +61,7 @@ void evaluate_helut(CKKS_params& pms, HELUT_Info& hi, double e, double p, bool m
                     cout << "SqMethod " << i+1 <<endl;
                     // compare_result(real_result, ckks_result, "REAL", "CKKS", real_result.size());
                     double max_err = compare_result_log(ckks_result, x.size(), true);
+                    cout << "Remaining Levels: " << ct.coeff_modulus_size() << endl;
                     cout << "---------------------------------" << endl;
                 }
             }
@@ -124,12 +111,13 @@ void evaluate_multi_remez(CKKS_params& pms, MR_Info& mi, double e, double p, boo
 
     Ciphertext ct = pms.encrypt(x);
     vector<vector<double>> coeffs = mi.coeffs;
-    vector<double> real_result, ckks_result, coeff, corr_factor;
+    vector<double> real_result, ckks_result, coeff, corr_factors;
+    double corr_factor;
 
     // 1. coeff 1차
     coeff = coeffs[0];
-    corr_factor = calculate_correction_factor(pms, coeff, ct);
-    ct = eval_even(pms, coeff, corr_factor, ct);
+    corr_factors = calculate_correction_factor(pms, coeff, ct);
+    ct = eval_even(pms, coeff, corr_factors, ct);
     if(res_print)
     {
         real_result = evaluate_function(coeff, x);
@@ -139,6 +127,7 @@ void evaluate_multi_remez(CKKS_params& pms, MR_Info& mi, double e, double p, boo
             cout << "Coeff Evaluation 0, degree " << coeff.size()-1 << endl;
             // compare_result(real_result, ckks_result, "REAL", "CKKS", x.size());
             double max_err = compare_result_log(ckks_result, x.size(), true);
+            cout << "Remaining Levels: " << ct.coeff_modulus_size() << endl;
             cout << "------------\n";
         }
     }
@@ -159,6 +148,7 @@ void evaluate_multi_remez(CKKS_params& pms, MR_Info& mi, double e, double p, boo
                 cout << "Coeff Evaluation " << i+1 << ", degree " << coeff.size()-1 << endl;
                 // compare_result(real_result, ckks_result, "REAL", "CKKS", x.size());
                 double max_err = compare_result_log(ckks_result, x.size(), true);
+                cout << "Remaining Levels: " << ct.coeff_modulus_size() << endl;
                 cout << "------------\n";
             }
         }
@@ -184,13 +174,13 @@ void evaluate_multi_remez(CKKS_params& pms, MR_Info& mi, double e, double p, boo
         }
     }
 
-    if(res_print)
-    {
-        cout << "Final Result: " << endl;
-        ckks_result = pms.decode_ctxt(ct);
-        compare_result(real_result, ckks_result, "REAL", "CKKS", real_result.size());
-        // compare_result_log(ckks_result, x.size(), true);
-    }
+    // if(res_print)
+    // {
+    //     cout << "Final Result: " << endl;
+    //     ckks_result = pms.decode_ctxt(ct);
+    //     compare_result(real_result, ckks_result, "REAL", "CKKS", real_result.size());
+    //     // compare_result_log(ckks_result, x.size(), true);
+    // }
 }
 
 // 다항식 평가
@@ -363,7 +353,7 @@ Ciphertext eval_even(CKKS_params& pms, vector<double> coeff, vector<double> corr
     return result;
 }
 
-Ciphertext eval_odd(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x)
+Ciphertext eval_odd(CKKS_params& pms, vector<double> coeff, double correction_factor, Ciphertext& x)
 {
     int max_deg = coeff.size() - 1;
     int cf_index = 0;
@@ -384,37 +374,27 @@ Ciphertext eval_odd(CKKS_params& pms, vector<double> coeff, vector<double> corre
     pms.eva->relinearize_inplace(x_square, pms.rlk);
     pms.eva->rescale_to_next_inplace(x_square);
 
-    // 첫 번째 항 = f1 * x^2 + b
-    pms.encoder->encode(1.0, x_square.parms_id(), scale * correction_factors[cf_index++], pt);
-    pms.eva->multiply_plain(x_square, pt, result);
-    pms.eva->rescale_to_next_inplace(result);
-
-    pms.encoder->encode(coeff[max_deg-2], result.parms_id(), result.scale(), pt);
-    pms.eva->add_plain_inplace(result, pt);
+    // 첫 번째 항 = x^2 + b/a
+    pms.encoder->encode(coeff[max_deg-2], x_square.parms_id(), x_square.scale(), pt);
+    pms.eva->add_plain(x_square, pt, result);
 
     // cout << log2(abs(result.scale() - scale)) << endl;
 
-    // 두 번째 항부터 반복
-    for(int i=max_deg-4; i>=0; i-=2)
+    // 두 번째 항
+    if(max_deg == 5)
     {
-        // fi * (x^2) and mod reduce
-        pms.encoder->encode(1.0, x_square.parms_id(), scale * correction_factors[cf_index++], pt);
-        pms.eva->multiply_plain(x_square, pt, temp);
-        pms.eva->rescale_to_next_inplace(temp);
-        pms.eva->mod_reduce_to_inplace(temp, result.parms_id());
-
         // 곱하기
-        pms.eva->multiply(result, temp, result);
+        pms.eva->multiply(result, x_square, result);
         pms.eva->relinearize_inplace(result, pms.rlk);
         pms.eva->rescale_to_next_inplace(result);
         
         // 더하기
-        pms.encoder->encode(coeff[i], result.parms_id(), result.scale(), pt);
+        pms.encoder->encode(coeff[1], result.parms_id(), result.scale(), pt);
         pms.eva->add_plain_inplace(result, pt);
     }
 
-    //마지막 항
-    pms.encoder->encode(outer_coeff, x.parms_id(), scale * correction_factors[cf_index++], pt);
+    //마지막 항(ax)
+    pms.encoder->encode(outer_coeff, x.parms_id(), scale * correction_factor, pt);
     pms.eva->multiply_plain(x, pt, temp);
     pms.eva->rescale_to_next_inplace(temp);
     pms.eva->mod_reduce_to_inplace(temp, result.parms_id());
@@ -453,29 +433,27 @@ vector<double> calculate_correction_factor(CKKS_params& pms, vector<double> coef
 }
 
 // correction factor 계산. 홀수차 다항식용.
-vector<double> calculate_correction_factor_odd(CKKS_params& pms, vector<double> coeff, Ciphertext& x)
+double calculate_correction_factor_odd(CKKS_params& pms, vector<double> coeff, Ciphertext& x)
 {
     const auto& coeff_modulus = pms.context->get_context_data(x.parms_id())->parms().coeff_modulus();
     int coeff_modulus_index = coeff_modulus.size() - 1;
     int max_deg = coeff.size() - 1;
 
     double scale, scale_p, scale_pp, scale_ppp;
-    double f1, f2, f3;
+    double f;
 
     scale = x.scale();
-    scale_p = (scale * scale) / static_cast<double_t>(coeff_modulus[coeff_modulus_index].value());
-    scale_pp = (scale_p * scale_p) / static_cast<double_t>(coeff_modulus[coeff_modulus_index-1].value());
+    scale_p = static_cast<double_t>(coeff_modulus[coeff_modulus_index].value());
+    scale_pp = static_cast<double_t>(coeff_modulus[coeff_modulus_index-1].value());
 
-    f1 = scale_p / scale;
-    f2 = (scale_p * scale_pp) / (scale * scale);
-
-    if(max_deg > 3)
+    if(max_deg == 3)
+        f = (scale_p * scale_p * scale_pp) / (scale * scale * scale);
+    else if(max_deg == 5)
     {
-        scale_ppp = (scale_pp * scale_pp) / static_cast<double_t>(coeff_modulus[coeff_modulus_index-2].value());
-        f3 = (scale_p * scale_ppp) / (scale * scale);
-        return {f1, f2, f3};
+        scale_ppp = static_cast<double_t>(coeff_modulus[coeff_modulus_index-2].value());
+        f = (pow(scale_p, 3) * scale_pp * scale_ppp) / pow(scale, 5);
     }
-    return {f1, f2};
+    return f;
 }
 
 double calculate_cleanse_correction_factor(CKKS_params& pms, Ciphertext& x)

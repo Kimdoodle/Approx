@@ -30,8 +30,8 @@ void test_base(int p_num, int s_num, int e_num, int N, size_t hwt, bool test_hel
     int helut_level = 0, remez_level = 0;
     if(test_helut)
     {
-        hi = parse_helut(p_num, 30);
-        helut_level = 1 + 2 + hi.r + 2 * hi.s;
+        hi = parse_helut(p_num, e_num);
+        helut_level = 2 + hi.r + 2 * hi.s;
     }
     if(test_remez)
     {
@@ -151,17 +151,14 @@ void test_cleanse_s(int p_num, int e_num, int s_num)
 */
 
 // 시간 측정
-void test_time(int p_num, int e_num, int s_num, bool test_helut, bool test_remez)
+void test_time(int p_num, int s_num, int e_num, int N_num, bool test_helut, bool test_remez)
 {
 
     if(test_remez)
-    {
-        test_remez_time(p_num, e_num, s_num, true);
-        std::cout << "##########################" << std::endl;
-    }
-
+        test_remez_time(p_num, e_num, s_num, N_num, true);
     if(test_helut)
-        test_helut_time(p_num, e_num, s_num, true);
+        test_helut_time(p_num, e_num, s_num, N_num, true);
+    std::cout << "##########################" << std::endl;
 }
 
 

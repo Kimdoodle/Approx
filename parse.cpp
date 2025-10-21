@@ -22,7 +22,7 @@ static double stod_safe(const std::string& s) {
 }
 
 HELUT_Info parse_helut(int p_num, int e_num) {
-    string filename = "doc/helut.txt";
+    const std::string filename = "doc/helut.txt";
     std::ifstream file(filename);
     if (!file.is_open())
         throw std::runtime_error("파일을 열 수 없습니다: " + filename);
@@ -33,15 +33,18 @@ HELUT_Info parse_helut(int p_num, int e_num) {
 
         std::istringstream iss(line);
         std::string token;
-        int p = 0, d = 0, e = 0, r = 0, u = 0, s = 0;
+        int p = 0, e = 0, r = 0, s = 0;
 
+        // 필요한 데이터만 인식
         while (iss >> token) {
-            if (token.rfind("p=", 0) == 0)      p = std::stoi(token.substr(2));
-            else if (token.rfind("d=", 0) == 0) d = std::stoi(token.substr(2));
-            else if (token.rfind("e=", 0) == 0) e = std::stoi(token.substr(2));
-            else if (token.rfind("r=", 0) == 0) r = std::stoi(token.substr(2));
-            else if (token.rfind("u=", 0) == 0) u = std::stoi(token.substr(2));
-            else if (token.rfind("s=", 0) == 0) s = std::stoi(token.substr(2));
+            if (token.rfind("p=", 0) == 0)
+                p = std::stoi(token.substr(2));
+            else if (token.rfind("e=", 0) == 0)
+                e = std::stoi(token.substr(2));
+            else if (token.rfind("r=", 0) == 0)
+                r = std::stoi(token.substr(2));
+            else if (token.rfind("s=", 0) == 0)
+                s = std::stoi(token.substr(2));
         }
 
         if (p == p_num && e == e_num) {

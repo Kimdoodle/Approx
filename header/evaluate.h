@@ -13,9 +13,9 @@ void evaluate_multi_remez(CKKS_params& pms, MR_Info& entries, double e, double p
 Ciphertext evaluate_func(CKKS_params& pms, vector<double> coeff, Ciphertext& x);
 // Ciphertext evaluate_func_even(CKKS_params& pms, vector<double> coeff, double scale, Ciphertext& x, bool correct_factor);
 Ciphertext eval_even(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x);
-Ciphertext eval_odd(CKKS_params& pms, vector<double> coeff, vector<double> correction_factors, Ciphertext& x);
+Ciphertext eval_odd(CKKS_params& pms, vector<double> coeff, double correction_factor, Ciphertext& x);
 vector<double> calculate_correction_factor(CKKS_params& pms, vector<double> coeff, Ciphertext& x);
-vector<double> calculate_correction_factor_odd(CKKS_params& pms, vector<double> coeff, Ciphertext& x);
+double calculate_correction_factor_odd(CKKS_params& pms, vector<double> coeff, Ciphertext& x);
 double calculate_cleanse_correction_factor(CKKS_params& pms, Ciphertext& x);
 Ciphertext cleanse(CKKS_params& pms, Ciphertext& x);
 int check_coeff_type(vector<double> coeff);

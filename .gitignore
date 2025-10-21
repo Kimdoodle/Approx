@@ -2,6 +2,7 @@ doc/
 CPET_SEAL/
 build/
 .vscode/
+venv/
 
 py_approx_test/__pycache__/
 py_approx_test/src_approx/__pycache__/

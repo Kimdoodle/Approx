@@ -5,7 +5,7 @@ using namespace std;
 // 1. HELUT, REMEZ 실행시간 비교
 
 // HELUT 시간 측정
-void test_helut_time(int p_num, int e_num, int s_num, bool print)
+void test_helut_time(int p_num, int e_num, int s_num, int N_num, bool print)
 {
     int iter = 10;
     chrono::_V2::system_clock::time_point start_time, end_time;
@@ -13,8 +13,7 @@ void test_helut_time(int p_num, int e_num, int s_num, bool print)
     double total_seconds = 0.0;
     double avg_seconds, seconds;
     double s = pow(2, s_num);
-    int N = 17;
-    size_t poly_modulus_degree = pow(2, N);
+    size_t poly_modulus_degree = pow(2, N_num);
     size_t hwt = 192;
     HELUT_Info hi = parse_helut(p_num, e_num);
     
@@ -26,7 +25,7 @@ void test_helut_time(int p_num, int e_num, int s_num, bool print)
 
     for(int i=0; i<iter; i++)
     {
-        poly_modulus_degree = pow(2, N);
+        poly_modulus_degree = pow(2, N_num);
         CKKS_params pms(modulus, s, poly_modulus_degree, hwt);
         start_time = cur_time();
         evaluate_helut(pms, hi, pow(2, -e_num), pow(2, p_num), false, false);
@@ -38,18 +37,19 @@ void test_helut_time(int p_num, int e_num, int s_num, bool print)
     avg_seconds = total_seconds / iter;
     if(print)
     {
+        cout << "HELUT" << endl;
         cout << "| Interval p:\t2^" << p_num << endl;
         cout << "| Precision e:\t2^-" << e_num << endl;
         cout << "| Scale s:\t2^" << 50 << endl;
         cout << "| Depth:\t" << 2 + hi.r + 2*hi.s << endl;
-        cout << "| Modulus:\t2^" << N << endl;
+        cout << "| Modulus:\t2^" << N_num << endl;
         cout << "| Average time:\t" << avg_seconds << "s" << endl;
         cout << "------------\n";
     }
 }
 
-// Remez 시간 증가량 측정
-void test_remez_time(int p_num, int e_num, int s_num, bool print)
+// Remez 실행시간 측정
+void test_remez_time(int p_num, int e_num, int s_num, int N_num, bool print)
 {
     int iter = 10;
     chrono::_V2::system_clock::time_point start_time, end_time;
@@ -64,7 +64,7 @@ void test_remez_time(int p_num, int e_num, int s_num, bool print)
 
     // depth count
     int remez_level = 0;
-    for(int i=0; i<mi.n; i++)
+    for(int i=0; i<mi.n - mi.s; i++)
         remez_level += evaluate_depth(mi.coeffs[i], true);
     // for(vector<double> coeff: mi.coeffs)
     //     remez_level += evaluate_depth(coeff, true);
@@ -73,11 +73,10 @@ void test_remez_time(int p_num, int e_num, int s_num, bool print)
     // modulus chain
     vector<int> modulus = {60};
     for(int i=0; i<remez_level; i++)
-        modulus.push_back(50);
+        modulus.push_back(s_num);
     modulus.push_back(60);
 
-    pmd = 17;
-    poly_modulus_degree = pow(2, pmd);
+    poly_modulus_degree = pow(2, N_num);
     size_t hwt = 192;
     CKKS_params pms(modulus, s, poly_modulus_degree, hwt);
     for(int i=0; i<iter; i++)
@@ -93,11 +92,12 @@ void test_remez_time(int p_num, int e_num, int s_num, bool print)
     avg_seconds = total_seconds / iter;
     if(print)
     {
+        cout << "REMEZ" << endl;
         cout << "| Interval p:\t2^" << p_num << endl;
         cout << "| Precision e:\t2^-" << e_num << endl;
         cout << "| Scale s:\t2^" << 50 << endl;
         cout << "| Depth:\t" << remez_level << endl;
-        cout << "| Modulus:\t2^" << pmd << endl;
+        cout << "| Modulus:\t2^" << N_num << endl;
         cout << "| Average time:\t" << avg_seconds << "s" << endl;
         cout << "------------\n";
     }
