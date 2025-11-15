@@ -103,8 +103,8 @@ def build_desmos_script(input_path: str, output_path: str = None) -> str:
 
 
 if __name__ == "__main__":
-    p = 2
-    e = 15
+    p = 6
+    e = 30
     in_file = f"doc/coeff_{p}_{e}.txt"           # 입력 파일 경로
     out_file = f"coeff_{p}_{e}_out.txt"     # 출력 파일 경로
     print(build_desmos_script(in_file, out_file))

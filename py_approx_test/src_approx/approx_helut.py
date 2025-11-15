@@ -24,9 +24,9 @@ def sqmethod(p: int, u: float, e: float) -> tuple[int, int, tuple, CalData]:
 
     # 연산량 계산
     cal_res = CalData()
-    cal_res.add_count = 1
-    cal_res.pt_mult_count = 1
-    cal_res.ct_mult_count = iter + 1
+    cal_res.cadd = 1
+    cal_res.pmult = 1
+    cal_res.cmult = iter + 1
     cal_res.depth = iter + 2
     
     return iter, u_num, (b1, b2, b3), cal_res
@@ -58,9 +58,9 @@ def helut(p_num: int, e_num: int):
     best = (0, 0, 0) # r, u, s
     best_caldata = CalData()
     best_caldata.depth = 99
-    best_caldata.add_count = 99
-    best_caldata.pt_mult_count = 99
-    best_caldata.ct_mult_count = 99
+    best_caldata.cadd = 99
+    best_caldata.pmult = 99
+    best_caldata.cmult = 99
 
     # 모든 경우의 수에 대하여 계산
     for u_num in range(1, e_num):

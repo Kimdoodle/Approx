@@ -2,6 +2,7 @@ import numpy as np
 from math import log2
 from .print import debug_print
 from scipy.optimize import brentq
+from cal_depth import check_coeff_type
 
 ''' 기타 필요한 함수들 '''
 # 다항함수 평가
@@ -90,31 +91,44 @@ def generate_points(start: np.float64, end: np.float64, step=np.float64(1e-10)):
         step *= np.float64(10.0)
 
 # 구간 [a, b]에서 f(x)-p(x)의 근을 계산
-def find_intersection(coeff, evalF, a, b) -> list:
-    x_points = generate_points(a, b)
-    roots = []
+def find_intersection(coeff, evalF, a, b, tol=1e-9) -> list:
+    x_points = generate_points(np.float64(a), np.float64(b))
+    cand = []
+
+    def f(x):
+        return evalP(coeff, x) - evalF(x)
+
     for i in range(len(x_points) - 1):
         x1, x2 = x_points[i], x_points[i+1]
-        y1 = evalP(coeff, x1) - evalF(x1)
-        y2 = evalP(coeff, x2) - evalF(x2)
-        
-        if y1 == 0:
-            roots.append(x1)
-        elif y2 == 0:
-            roots.append(x2)
-        elif y1 * y2 < 0:
+        y1, y2 = f(x1), f(x2)
+
+        # 거의 0인 경우(경계 중복 방지: 왼쪽 끝만 채택)
+        if np.isfinite(y1) and np.isclose(y1, 0.0, atol=tol):
+            cand.append(float(x1))
+            continue
+        if np.isfinite(y2) and np.isclose(y2, 0.0, atol=tol):
+            # x2는 다음 구간의 x1이므로 여기서는 추가하지 않음
+            pass
+        elif np.isfinite(y1) and np.isfinite(y2) and y1 * y2 < 0:
             try:
-                root = brentq(lambda x: evalP(coeff, x) - evalF(x), x1, x2)
-                roots.append(root)
-            except ValueError as e:
-                print("Find Intersection ERR!!")
-                print(e)
+                root = brentq(f, x1, x2)
+                cand.append(float(root))
+            except ValueError:
+                # 브래킷 문제나 불연속 등은 스킵
+                pass
+
+    # 허용오차로 중복 제거
+    cand.sort()
+    roots = []
+    for x in cand:
+        if not roots or not np.isclose(x, roots[-1], atol=tol):
+            roots.append(x)
     return roots
 
 # 구간 변경
 def slice_interval(approx_mode: str, intervals: list) -> list:
-    if approx_mode in ["all"]:
-        return intervals
+    # if approx_mode in ["all", "etc"]:
+    #     return intervals
     
     # 기존 구간 intervals 정렬
     new_intervals = []
@@ -152,7 +166,7 @@ def solve_matrix(A: np.ndarray, y: np.ndarray, n: int, powers: list) -> tuple[li
     try:
         B = np.linalg.solve(A, y)
     except np.linalg.LinAlgError:
-        print("singular matrix error!")
+        # print("singular matrix error!")
         # print(f"A:\n{A}")
         return [-1], -1
     E = B[-1]
@@ -202,6 +216,8 @@ def calculate_local_max(coeff, evalF, intervals: list) -> tuple:
 # 종료조건 판단
 def decide_exit(errors: list, threshold: float, print_mode: str) -> bool:
     max_err, min_err = max(errors), min(errors)
+    if abs(max_err - min_err) <= 1e-9:
+        return True
     debug_print(f"Min/Max error\t\t: {min_err:.5f}, {max_err:.5f}", print_mode)
     if min_err != 0:
         exit_err = (max_err - min_err) / min_err
@@ -217,23 +233,38 @@ def decide_exit(errors: list, threshold: float, print_mode: str) -> bool:
 # remez 다음을 위한 interval, max_err 계산
 # mode1 : errbound계산에 B_clean 고려
 # mode2 : errbound계산에 B_scale만 고려
-def calculate_next_remez(coeff, evalF, eb, intervals, err_mode: int):
+def calculate_next_remez(coeff, evalF, eb, intervals):
+    # if (
+    #     len(coeff) >= 3
+    #     and coeff[0] != 0
+    #     and coeff[-1] != 0
+    #     and coeff[-2] != 0
+    #     and all(x == 0 for i, x in enumerate(coeff) if i not in (0, len(coeff)-1, len(coeff)-2))
+    # ):
+    #     pass
     ni = []
-    max_err = 0
-
-    for start, end in intervals:
+    max_err0 = 0
+    max_err1 = 0
+    coeff_type = check_coeff_type(coeff)
+    
+    for i, interval in enumerate(intervals):
+        start = interval[0]
+        end = interval[1]
         if start == end:
             val = evalF(start) - evalP(coeff, start)
-            err = eb.cal_bound(start, coeff, err_mode)/eb.scale
-            val1 = val + err
-            val2 = val - err
+            err2 = eb.cal_bound(start, coeff, coeff_type)/eb.scale
+            val1 = val + err2
+            val2 = val - err2
             ni.append([val2, val1])
-            max_err = max(val1, max_err)
+            if i == 0:
+                max_err0 = max(val1, max_err0)
+            else:
+                max_err1 = max(val1, max_err1)
         else:
             points = generate_points(start, end)
             try:
-                p_vals1      = np.fromiter((evalP(coeff, p) + eb.cal_bound(p, coeff, err_mode)/eb.scale for p in points), dtype=float, count=points.size)
-                p_vals2      = np.fromiter((evalP(coeff, p) - eb.cal_bound(p, coeff, err_mode)/eb.scale for p in points), dtype=float, count=points.size)
+                p_vals1      = np.fromiter((evalP(coeff, p) + eb.cal_bound(p, coeff, coeff_type)/eb.scale for p in points), dtype=float, count=points.size)
+                p_vals2      = np.fromiter((evalP(coeff, p) - eb.cal_bound(p, coeff, coeff_type)/eb.scale for p in points), dtype=float, count=points.size)
                 f_vals      = np.fromiter((evalF(p) for p in points), dtype=float, count=points.size)
 
                 err_vals = np.concatenate((np.abs(f_vals - p_vals1), np.abs(f_vals - p_vals2)))
@@ -241,18 +272,24 @@ def calculate_next_remez(coeff, evalF, eb, intervals, err_mode: int):
                 ni.append([np.min(vals), np.max(vals)])
                 
                 # 최대오차
-                max_err = max(np.max(err_vals), max_err)
+                if i == 0:
+                    max_err0 = max(np.max(err_vals), max_err0)
+                else:
+                    max_err1 = max(np.max(err_vals), max_err1)
             except Exception as e:
+                print("CNR err")
+                print(coeff)
                 print(e)
+                return 99, 99, [[0,0], [1,1]]
     
     # 정렬 - 구간이 긴 쪽이 다음 근사에서 0으로 수렴해야함
-    if (ni[0][1]-ni[0][0]) < (ni[1][1]-ni[1][0]):
-        ni.reverse()
-
-    # if ni[0][0] > ni[1][0]:
+    # if (ni[0][1]-ni[0][0]) < (ni[1][1]-ni[1][0]):
     #     ni.reverse()
 
-    return max_err, ni
+    if ni[0][0] > ni[1][0]:
+        ni.reverse()
+
+    return max_err0, max_err1, ni
 
 
 

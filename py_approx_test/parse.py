@@ -1,6 +1,9 @@
 import re
 from pathlib import Path
 from typing import List, Tuple
+from cal_depth import CalData, cal_coeff
+from src_approx.approx_remez import remezData
+import os
 
 # "<계수>x^<지수>" 패턴(공백 허용)
 TERM_RE = re.compile(r'([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*x\^(\-?\d+)', re.I)
@@ -126,15 +129,31 @@ def load_coeff_file(path: str) -> list[list[float]]:
             coeffs.append(row)
     return coeffs
 
+def get_file(p_num):
+    doc_dir = "doc"
+    file_pattern = re.compile(rf"^coeff_{p_num}_(\d+)\.txt$")
+    os.makedirs(doc_dir, exist_ok=True)
+    existing_files = [os.path.join(doc_dir, f) for f in os.listdir(doc_dir) if file_pattern.match(f)]
 
-# 사용 예시
-if __name__ == "__main__":
-    coeff_list = load_coeff_file("/mnt/data/coeff_10_32.txt")
-    for row in coeff_list:
-        print(row)
+    return existing_files
+
+def parse_into_remezData(filename: str):
+    # try:
+    #     filename = get_file(p_num)[0]
+    # except:
+    #     print("False")
+    #     return False
+    
+    coeffs = load_coeff_file(filename)
+    data = remezData([])
+    for coeff in coeffs:
+        data.update(coeff, 1, [])
+    # print(data.total_CalData.depth)
+    return data
+
 
 if __name__ == "__main__":
-    p = 5
-    e = 34
-    in_file = f"coeff_{p}_{e}.txt"           # 입력 파일 경로
+    p = 2
+    e = 30
+    in_file = f"doc/coeff_{p}_{e}.txt"           # 입력 파일 경로
     print(build_desmos_script(in_file))

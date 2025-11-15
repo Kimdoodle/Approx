@@ -5,28 +5,28 @@ class CalData:
         self.title = title
         self.iter = iter
         self.depth = 0
-        self.add_count = 0
-        self.pt_mult_count = 0
-        self.ct_mult_count = 0
+        self.cadd = 0
+        self.pmult = 0
+        self.cmult = 0
 
     def add(self, c2: 'CalData', mode="add"):
         if mode == "add":
             self.depth += c2.depth
         elif mode == "compare":
             self.depth = self.depth if self.depth >= c2.depth else c2.depth
-        self.add_count += c2.add_count
-        self.pt_mult_count += c2.pt_mult_count
-        self.ct_mult_count += c2.ct_mult_count
+        self.cadd += c2.cadd
+        self.pmult += c2.pmult
+        self.cmult += c2.cmult
 
     def compare(self, other: 'CalData', criteria: str) -> int:
         if criteria == "depth":
             a, b = self.depth, other.depth
         elif criteria == "ctxt":
-            a, b = self.ct_mult_count, other.ct_mult_count
+            a, b = self.cmult, other.cmult
         elif criteria == "both":
             ad, bd = self.depth, other.depth
-            ac, bc = self.ct_mult_count, other.ct_mult_count
-            aa, ba = self.add_count, other.add_count
+            ac, bc = self.cmult, other.cmult
+            aa, ba = self.cadd, other.cadd
             
             if ad > bd: return -1
             elif ad < bd: return 1
@@ -52,12 +52,34 @@ class CalData:
         if iter:
             print(f"Iter:\t\t{self.iter}")
         print(f"Depth:\t\t{self.depth}")
-        print(f"Add:\t\t{self.add_count}")
-        print(f"Ptxt Mult:\t{self.pt_mult_count}")
-        print(f"Ctxt mult:\t{self.ct_mult_count}")
+        print(f"Add:\t\t{self.cadd}")
+        print(f"Ptxt Mult:\t{self.pmult}")
+        print(f"Ctxt mult:\t{self.cmult}")
 
 
 # 함수 종류 확인
+def check_coeff_type(coeff: list):
+    degrees = [i for i, c in enumerate(coeff) if c != 0]
+    if not degrees:
+        return "etc"
+
+    max_deg = max(degrees)
+    
+    # 1. 홀수차 함수
+    if all(d % 2 == 1 for d in degrees):
+        return "odd"
+
+    # 2. 짝수차 함수
+    if all(d % 2 == 0 for d in degrees):
+        return "even"
+
+    # 3. Cleanse 함수
+    if max_deg % 2 == 1 and all(d in {max_deg, max_deg - 1} for d in degrees):
+        return "cl"
+
+    # 4. 기타
+    return "etc"
+
 def detect_coeff_type(coeff: list[float]) -> str:
     has_even = any(abs(c) != 0.0 for i, c in enumerate(coeff) if i % 2 == 0)
     has_odd  = any(abs(c) != 0.0 for i, c in enumerate(coeff) if i % 2 == 1)
@@ -72,38 +94,55 @@ def detect_coeff_type(coeff: list[float]) -> str:
 def cal_iter(coeff: list[float], iter: int) -> CalData:
     res = cal_coeff(coeff)
     res.depth *= iter
-    res.add_count *= iter
-    res.ct_mult_count *= iter
-    res.pt_mult_count *= iter
+    res.cadd *= iter
+    res.cmult *= iter
+    res.pmult *= iter
     return res
 
 # 특정 함수의 연산량, 깊이 계산
 def cal_coeff(coeff: list[float]) -> CalData:        
     # 함수가 홀수/짝수/전체인지 확인
-    coeff_type = detect_coeff_type(coeff)
+    coeff_type = check_coeff_type(coeff)
     res = CalData()
     max_deg = len(coeff) - 1
+    data = {
+        2: (2, 1, 1, 2),
+        3: (2, 2, 2, 3),
+        4: (3, 2, 3, 4),
+        5: (3, 3, 3, 5),
+        6: (3, 4, 3, 6)
+    }
+    match coeff_type:
+        case "cl":
+            res.cmult = int((max_deg+1) / 2)
+            res.cadd = 1
+            res.pmult = 1
+            res.depth = int(ceil(log2(max_deg + 1)))
+            return res
+        case "etc":
+            res.depth, res.cmult, res.pmult, res.cadd = data[max_deg]
+            # print(res.depth, res.cmult, res.pmult, res.cadd)
+            
+            # res.ct_mult_count = max_deg - 1
+            # res.add_count = max_deg
+            # res.depth = int(ceil(log2(max_deg + 1)))
+        case "even":
+            if max_deg <= 4:
+                res.cmult = int(max_deg / 2)
+                res.cadd = int(max_deg / 2)
+                res.depth = int(ceil(log2(max_deg + 1)))
+            else:
+                res.depth = 3
+                res.cmult = 3
+                res.pmult = 2
+                res.cadd = 3
+                return res
+                
+        case "odd":
+            res.cmult = int(max_deg / 2) + 1
+            res.cadd = int(max_deg / 2)
+            res.depth = res.cmult
 
-    # cleanse용
-    if coeff == [0, 0, 3, -2]:
-        res.ct_mult_count = 2
-        res.add_count = 1
-        res.pt_mult_count = 2
-        res.depth = 2
-        return res
-    if coeff_type == "all":
-        res.ct_mult_count = max_deg - 1
-        res.add_count = max_deg
-        res.depth = res.ct_mult_count + 1
-    elif coeff_type == "even":
-        res.ct_mult_count = int(max_deg / 2)
-        res.add_count = int(max_deg / 2)
-        res.depth = res.ct_mult_count + 1
-    elif coeff_type == "odd":
-        res.ct_mult_count = int(max_deg / 2) + 1
-        res.add_count = int(max_deg / 2)
-        res.depth = res.ct_mult_count
-
-    res.pt_mult_count = 1
+    res.pmult = 1
 
     return res
