@@ -1,10 +1,10 @@
 import numpy as np
-from src_remez.algorithm import remez_algorithm, cleanse
+from src_remez.algorithm import remez_algorithm
 from src_remez.print_plot import *
 from src_remez.print import print_intervals, debug_print, coeff2txt, interval2txt
 from src_remez.basic import calculate_next_remez
 from src_errbound.error_bound import EB
-from cal_depth import cal_coeff, CalData
+from cal_depth import cal_coeff, CalData, check_coeff_type
 from math import log2
 from multiprocessing import Pool, cpu_count
 import copy
@@ -37,77 +37,17 @@ class remezData:
         chal_depth = challenger.total_CalData.depth
         chal_cmult = challenger.total_CalData.cmult
         chal_pmult = challenger.total_CalData.pmult
-        chal_add = self.total_CalData.cadd
-        
-        # 완료된 두 경로를 비교
-        if mode == "end":
-            if self_depth > chal_depth:
-                return True
-            elif self_depth == chal_depth:
-                if self_cmult > chal_cmult:
-                    return True
-                elif self_cmult == chal_cmult:
-                    if self_pmult > chal_pmult:
-                        return True
-                    elif self_pmult == chal_pmult:
-                        if self_add > chal_add:
-                            return True
-                        elif self_add == chal_add:
-                            return 99
-                        else:
-                            return False
-                    else:
-                        return False
-                else:
-                    return False
-            else:
-                return False
-        # 완료된 경로(self)와 불완전한 경로(chal)를 비교
-        # chal의 depth가 더 큰데 정밀도가 낮은 경우 False를 반환
-        elif mode == "onRoute":
-            sp = self.pre_log[-1]
-            cp = challenger.pre_log[-1]
-            
-            if self_depth < chal_depth and sp > cp:
-                return False
-            elif self_depth == chal_depth and self_cmult < chal_cmult and sp > cp:
-                return False
-            elif self_depth == chal_depth and self_cmult == chal_cmult and self_pmult < chal_pmult and sp > cp:
-                return False
-            elif self_depth == chal_depth and self_cmult == chal_cmult and self_pmult == chal_pmult and self_add > chal_add and sp > cp:
-                return False
-            return True
-        
-        return False
-            
-        
-        # if mode == "onRoute": # 경로 도중에 비교
-        #     comRes = self.total_CalData.compare(challenger.total_CalData, "both")
-        #     if comRes == 1:# and self.pre_log[-1] > challenger.pre_log[-1]:
-        #         return 0
-        #     else:
-        #         return 1                
-    
-        # res = self.total_CalData.compare(challenger.total_CalData, "both")
-        # if res == 0:
-        #     if len(self.coeff_log) < len(challenger.coeff_log):
-        #         return 1
-        #     elif len(self.coeff_log) > len(challenger.coeff_log):
-        #         return -1
-        #     else:
-        #         if self.pre_log[-1] < challenger.pre_log[-1]:
-        #             return 1
-        #         elif self.pre_log[-1] > challenger.pre_log[-1]:
-        #             return -1
-        # return res
+        chal_add = challenger.total_CalData.cadd
 
-    """
-        새로운 비교방안????
-        1. 동일하게 각각 계산복잡도 비교
-        2. 동일한 depth ->  
-    """
-    # def compare(self, challenger: 'remezData') -> int:
-    #     pass
+        self_comp = (self_depth, self_cmult, self_pmult, self_add)
+        chal_comp = (chal_depth, chal_cmult, chal_pmult, chal_add)
+
+        if self_comp > chal_comp:
+            return True
+        elif self_comp == chal_comp:
+            return 99
+        else:
+            return False
 
     def print_params(self):
         print(f"precision: ", end='')
@@ -127,6 +67,11 @@ class remezData:
         print(f"total complexity:")
         self.total_CalData.print_params()
         print("#"*20)
+    
+    def print_coeff_type(self):
+        for coeff in self.coeff_log:
+            ct = check_coeff_type(coeff)
+            print(f"{ct}({len(coeff)-1}) -> ", end='')
     
 def remez_recursion(routes: list, data: remezData, p_num: int, e_num: int, max_n: int, eb: EB, approx_mode: str, printmode="debug") -> list:
     n = max_n-1 if approx_mode == "odd" else max_n

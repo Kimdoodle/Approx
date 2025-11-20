@@ -62,33 +62,48 @@ def sample_points_multi(m, intervals, print_mode) -> np.ndarray:
     x.sort()
     return x
 
-def generate_points(start: np.float64, end: np.float64, step=np.float64(1e-10)):
+# def generate_points(start: np.float64, end: np.float64, step=np.float64(1e-10)):
+#     if start == end:
+#         return np.array([np.float64(start)], dtype=np.float64)
+
+#     max_points = 10000  # 최대 허용 포인트 수
+#     step = np.float64(step)
+
+#     while True:
+#         # 예상되는 포인트 개수 (양 끝 포함)
+#         size_est = int(np.floor((end - start) / step)) + 1
+
+#         # 포인트 개수가 허용 범위 내면 실제 생성
+#         if size_est <= max_points:
+#             # 직접 계산 (누적오차 방지)
+#             points = start + np.arange(size_est, dtype=np.float64) * step
+
+#             # 마지막 점이 end보다 작으면 end를 추가하여 양 끝 포함 보장
+#             if points[-1] < end:
+#                 points = np.append(points, end)
+#             # 오차로 end를 살짝 초과한 경우 end로 클램프
+#             elif points[-1] > end:
+#                 points[-1] = end
+
+#             return points
+
+#         # 초과 시 step 증가 (샘플링 간격 10배 확대)
+#         step *= np.float64(10.0)
+        
+def generate_points(start: np.float64, end: np.float64, step=100):
+    """
+    a, b 구간을 num_points 개수만큼 균등 분할하여 샘플링한다.
+    매우 작은 값 ~ 큰 값 사이에서도 균일 간격을 보장한다.
+    """
+    num_points: int = 10000
+    start = np.float64(start)
+    end = np.float64(end)
+
     if start == end:
-        return np.array([np.float64(start)], dtype=np.float64)
+        return np.array([start], dtype=np.float64)
 
-    max_points = 10000  # 최대 허용 포인트 수
-    step = np.float64(step)
-
-    while True:
-        # 예상되는 포인트 개수 (양 끝 포함)
-        size_est = int(np.floor((end - start) / step)) + 1
-
-        # 포인트 개수가 허용 범위 내면 실제 생성
-        if size_est <= max_points:
-            # 직접 계산 (누적오차 방지)
-            points = start + np.arange(size_est, dtype=np.float64) * step
-
-            # 마지막 점이 end보다 작으면 end를 추가하여 양 끝 포함 보장
-            if points[-1] < end:
-                points = np.append(points, end)
-            # 오차로 end를 살짝 초과한 경우 end로 클램프
-            elif points[-1] > end:
-                points[-1] = end
-
-            return points
-
-        # 초과 시 step 증가 (샘플링 간격 10배 확대)
-        step *= np.float64(10.0)
+    # numpy.linspace는 float 연산 누적 오차 없이 균등 분할 생성 가능
+    return np.linspace(start, end, num_points, dtype=np.float64)
 
 # 구간 [a, b]에서 f(x)-p(x)의 근을 계산
 def find_intersection(coeff, evalF, a, b, tol=1e-9) -> list:
@@ -102,20 +117,34 @@ def find_intersection(coeff, evalF, a, b, tol=1e-9) -> list:
         x1, x2 = x_points[i], x_points[i+1]
         y1, y2 = f(x1), f(x2)
 
-        # 거의 0인 경우(경계 중복 방지: 왼쪽 끝만 채택)
-        if np.isfinite(y1) and np.isclose(y1, 0.0, atol=tol):
-            cand.append(float(x1))
+        if not (np.isfinite(y1) and np.isfinite(y2)):
             continue
-        if np.isfinite(y2) and np.isclose(y2, 0.0, atol=tol):
-            # x2는 다음 구간의 x1이므로 여기서는 추가하지 않음
-            pass
-        elif np.isfinite(y1) and np.isfinite(y2) and y1 * y2 < 0:
+
+        if y1 == 0:
+            cand.append(float(x1))
+        elif y2 == 0:
+            cand.append(float(x2))
+        elif y1 * y2 < 0:
             try:
                 root = brentq(f, x1, x2)
                 cand.append(float(root))
-            except ValueError:
-                # 브래킷 문제나 불연속 등은 스킵
+            except Exception:
                 pass
+        
+        # # 거의 0인 경우(경계 중복 방지: 왼쪽 끝만 채택)
+        # if np.isfinite(y1) and np.isclose(y1, 0.0, atol=tol):
+        #     cand.append(float(x1))
+        #     continue
+        # if np.isfinite(y2) and np.isclose(y2, 0.0, atol=tol):
+        #     # x2는 다음 구간의 x1이므로 여기서는 추가하지 않음
+        #     pass
+        # elif np.isfinite(y1) and np.isfinite(y2) and y1 * y2 < 0:
+        #     try:
+        #         root = brentq(f, x1, x2)
+        #         cand.append(float(root))
+        #     except ValueError:
+        #         # 브래킷 문제나 불연속 등은 스킵
+        #         pass
 
     # 허용오차로 중복 제거
     cand.sort()
@@ -278,8 +307,8 @@ def calculate_next_remez(coeff, evalF, eb, intervals):
                     max_err1 = max(np.max(err_vals), max_err1)
             except Exception as e:
                 print("CNR err")
-                print(coeff)
-                print(e)
+                # print(coeff)
+                # print(e)
                 return 99, 99, [[0,0], [1,1]]
     
     # 정렬 - 구간이 긴 쪽이 다음 근사에서 0으로 수렴해야함

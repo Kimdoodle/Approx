@@ -1,3 +1,4 @@
+import os
 
 def debug_print(message: str, mode: str, end='\n') -> None:
     if mode == "debug":
@@ -38,3 +39,13 @@ def coeff2txt(coeff: list) -> str:
             else:
                 txt += f"{ele}x^{i}"
     return txt
+
+def write_params(p_num, e_num, newData, tail: str):
+    # 새 파일 생성
+    doc_dir: str = "doc"
+    os.makedirs(doc_dir, exist_ok=True)
+    filepath = os.path.join(doc_dir, f"coeff_{tail}_{p_num}_{e_num}.txt")
+    with open(filepath, "w", encoding="utf-8") as f:
+        for coeff in newData.coeff_log:
+            f.write(coeff2txt(coeff))
+            f.write('\n')
