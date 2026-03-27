@@ -1,0 +1,86 @@
+p=2^10, e=2^30
+Init approximation
+n=8 failed.
+Init approximation
+n=6 failed.
+Init approximation
+n=4 failed.
+Init approximation(PS) 
+ n=2, step 0, intervals: [-0.4999995439, 0.4999995223] [0.5000004777, 0.5000004778] 
+------------------------------
+Step 1: Processing 1 routes...
+[PROGRESS] Step 1: 100%|##########| 1/1 [00:01<00:00,  1.54s/it]
+Step 1: DONE (1/1) | step_time=1.59s
+	6 routes newly calculated.
+	0 routes additionally completed.
+	1 routes pruned.
+------------------------------
+Step 2: Processing 5 routes...
+[PROGRESS] Step 2: 100%|##########| 5/5 [00:00<00:00, 17.62it/s]
+Step 2: DONE (5/5) | step_time=0.28s
+	50 routes newly calculated.
+	0 routes additionally completed.
+	0 routes pruned.
+------------------------------
+Step 3: Processing 50 routes...
+[PROGRESS] Step 3: 100%|##########| 50/50 [00:00<00:00, 81.96it/s]
+Step 3: DONE (50/50) | step_time=0.61s
+	546 routes newly calculated.
+	0 routes additionally completed.
+	2 routes pruned.
+------------------------------
+Step 4: Processing 544 routes...
+[PROGRESS] Step 4: 100%|##########| 544/544 [00:06<00:00, 90.47it/s]
+Step 4: DONE (544/544) | step_time=6.02s
+	6381 routes newly calculated.
+	0 routes additionally completed.
+	11 routes pruned.
+------------------------------
+Step 5: Processing 6370 routes...
+[PROGRESS] Step 5: 100%|##########| 6370/6370 [01:09<00:00, 92.25it/s]
+Step 5: DONE (6370/6370) | step_time=69.18s
+	76360 routes newly calculated.
+	0 routes additionally completed.
+	20 routes pruned.
+------------------------------
+Step 6: Processing 76340 routes...
+[PROGRESS] Step 6: 100%|##########| 76340/76340 [14:40<00:00, 86.72it/s]
+
+Step 6: DONE (76340/76340) | step_time=883.18s
+	899415 routes newly calculated.
+	8371 routes additionally completed.
+	110096 routes pruned.
+------------------------------
+Step 7: Processing 780948 routes...
+[PROGRESS] Step 7: 100%|##########| 780948/780948 [2:22:43<00:00, 91.19it/s] 
+
+
+Step 7: DONE (780948/780948) | step_time=8564.59s
+	8071807 routes newly calculated.
+	680115 routes additionally completed.
+	4442198 routes pruned.
+------------------------------
+Step 8: Processing 2949494 routes...
+[PROGRESS] Step 8: 100%|##########| 2949494/2949494 [8:40:27<00:00, 94.45it/s] 
+
+
+Step 8: DONE (2949494/2949494) | step_time=31227.62s
+	28638737 routes newly calculated.
+	3510884 routes additionally completed.
+	23342469 routes pruned.
+------------------------------
+Step 9: Processing 1785384 routes...
+[PROGRESS] Step 9: 100%|##########| 1785384/1785384 [4:46:00<00:00, 104.04it/s]
+
+
+Step 9: DONE (1785384/1785384) | step_time=17160.41s
+	0 routes newly calculated.
+	0 routes additionally completed.
+	0 routes pruned.
+------------------------------
+[Step2] total_time=57956.85s
+Saved best solution to doc/coeff_10_30.txt
+(p, e): 10, 30
+precision: 1.0000013161023313 -> 1.000021555652113 -> 1.0006116623986199 -> 1.0247425930820033 -> 1.8162385190054875 -> 11.675218405244479 -> 30
+coeff: 2 -> 4 -> 6 -> 6 -> 6 -> 6 -> 5
+DCPA: 20|18|9|20

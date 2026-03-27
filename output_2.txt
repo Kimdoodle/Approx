@@ -1,0 +1,47 @@
+p=2^2, e=2^30
+Init approximation(PS) 
+ n=8, step 0, intervals: [-0.1107359075, 0.1107403807] [0.8892816976, 0.8892816977] 
+------------------------------
+Init approximation(PS) 
+ n=6, step 0, intervals: [-0.1975387263, 0.1975286993] [0.8024719865, 0.8024719892] 
+------------------------------
+Init approximation(PS) 
+ n=4, step 0, intervals: [-0.3220551372, 0.3195488741] [0.6804511261, 0.6804511262] 
+------------------------------
+Init approximation(PS) 
+ n=2, step 0, intervals: [-0.4444444452, 0.4444444451] [0.5555555549, 0.5555555549] 
+------------------------------
+Step 1: Processing 4 routes...
+[PROGRESS] Step 1: 100%|##########| 4/4 [00:01<00:00,  2.51it/s]
+Step 1: DONE (4/4) | step_time=1.64s
+	48 routes newly calculated.
+	0 routes additionally completed.
+	1 routes pruned.
+------------------------------
+Step 2: Processing 47 routes...
+[PROGRESS] Step 2: 100%|##########| 47/47 [00:00<00:00, 72.56it/s]
+Step 2: DONE (47/47) | step_time=0.65s
+	412 routes newly calculated.
+	72 routes additionally completed.
+	79 routes pruned.
+------------------------------
+Step 3: Processing 261 routes...
+[PROGRESS] Step 3: 100%|##########| 261/261 [00:01<00:00, 141.76it/s]
+Step 3: DONE (261/261) | step_time=1.84s
+	1416 routes newly calculated.
+	463 routes additionally completed.
+	889 routes pruned.
+------------------------------
+Step 4: Processing 64 routes...
+[PROGRESS] Step 4: 100%|##########| 64/64 [00:00<00:00, 118.67it/s]
+Step 4: DONE (64/64) | step_time=0.54s
+	451 routes newly calculated.
+	153 routes additionally completed.
+	298 routes pruned.
+------------------------------
+[Step2] total_time=4.72s
+Saved best solution to doc/coeff_2_30.txt
+(p, e): 2, 30
+precision: 2.3397925821849768 -> 8.005467598356235 -> 30
+coeff: 6 -> 3 -> 6
+DCPA: 8|8|4|7

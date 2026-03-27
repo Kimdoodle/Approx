@@ -1,0 +1,3 @@
+[submodule "external/RpolyPlusPlus"]
+	path = external/RpolyPlusPlus
+	url = https://github.com/sweeneychris/RpolyPlusPlus.git

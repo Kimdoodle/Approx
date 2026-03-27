@@ -1,0 +1,55 @@
+p=2^4, e=2^30
+Init approximation(PS) 
+ n=8, step 0, intervals: [-0.4663545218, 0.4659804806] [0.5340448143, 0.5340448144] 
+------------------------------
+Init approximation(PS) 
+ n=6, step 0, intervals: [-0.4805165016, 0.4804704862] [0.5195352287, 0.5195364504] 
+------------------------------
+Init approximation(PS) 
+ n=4, step 0, intervals: [-0.4911896023, 0.4911896047] [0.5088104001, 0.5088104001] 
+------------------------------
+Init approximation(PS) 
+ n=2, step 0, intervals: [-0.4977777781, 0.4977777778] [0.5022222222, 0.5022222222] 
+------------------------------
+Step 1: Processing 4 routes...
+[PROGRESS] Step 1: 100%|##########| 4/4 [00:01<00:00,  2.58it/s]
+Step 1: DONE (4/4) | step_time=1.63s
+	48 routes newly calculated.
+	0 routes additionally completed.
+	0 routes pruned.
+------------------------------
+Step 2: Processing 48 routes...
+[PROGRESS] Step 2: 100%|##########| 48/48 [00:00<00:00, 65.90it/s]
+Step 2: DONE (48/48) | step_time=0.73s
+	574 routes newly calculated.
+	2 routes additionally completed.
+	0 routes pruned.
+------------------------------
+Step 3: Processing 572 routes...
+[PROGRESS] Step 3: 100%|##########| 572/572 [00:05<00:00, 98.41it/s]
+
+Step 3: DONE (572/572) | step_time=5.82s
+	5578 routes newly calculated.
+	688 routes additionally completed.
+	1521 routes pruned.
+------------------------------
+Step 4: Processing 3369 routes...
+[PROGRESS] Step 4: 100%|##########| 3369/3369 [00:26<00:00, 125.36it/s]
+Step 4: DONE (3369/3369) | step_time=26.93s
+	24436 routes newly calculated.
+	7075 routes additionally completed.
+	15281 routes pruned.
+------------------------------
+Step 5: Processing 2080 routes...
+[PROGRESS] Step 5: 100%|##########| 2080/2080 [00:17<00:00, 121.49it/s]
+Step 5: DONE (2080/2080) | step_time=17.14s
+	17256 routes newly calculated.
+	4714 routes additionally completed.
+	12542 routes pruned.
+------------------------------
+[Step2] total_time=52.46s
+Saved best solution to doc/coeff_4_30.txt
+(p, e): 4, 30
+precision: 1.0064262681200669 -> 1.2254232120266897 -> 5.957303423376204 -> 30
+coeff: 2 -> 6 -> 6 -> 6
+DCPA: 11|10|7|13
