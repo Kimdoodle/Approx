@@ -6,13 +6,14 @@ static double stod_safe(const std::string& s) {
     return std::stod(s);
 }
 
-std::vector<std::vector<double>> parse_remez_coeff(int p_num, int e_num, bool print)
+std::vector<std::vector<double>> parse_remez_coeff(int p_num, int e_num, std::string criteria, bool print)
 {
     int line_count = 0;  // 전체 줄 개수
 
     // 1) 파일명: coeff_pnum_enum.txt 
-    const std::string filename = "doc/coeff_" + std::to_string(p_num) + "_" + std::to_string(e_num) + ".txt";
-    std::cout << "Opening " << filename << std::endl;
+    const std::string filename = std::format("doc/coeff_{}_{}_{}.txt", criteria, p_num, e_num);
+    // const std::string filename = std::format("doc_ERE3/data/coeff_{}_{}_{}.txt", criteria, p_num, e_num);
+    std::cout << std::format("Opening {}", filename) << std::endl;
     
     // 2) 계수 파일 파싱
     std::ifstream infile(filename);
@@ -260,13 +261,18 @@ std::string EvalStep::serialize_dcmp(std::shared_ptr<Decomp> dcmp)
         }
         else
         {
-            //ax^i * x^j인 경우
-            //ax^i
-            xi_key = std::format("P{}", xi.route.back().first);
-            axi_key = this->add_step(coeff_key, xi_key, 'x');
-            //(ax^i)(x^j)
-            std::string xj_key = std::format("P{}", xi.route.back().second);
-            axi_key = this->add_step(axi_key, xj_key, 'x');
+            if (xi.route.empty()) // a * x^i
+            {
+                xi_key = std::format("P{}", xi.n);
+                axi_key = this->add_step(coeff_key, xi_key, 'x');
+            }
+            else // ax^i * x^j
+            {
+                xi_key = std::format("P{}", xi.route.back().first);
+                axi_key = this->add_step(coeff_key, xi_key, 'x');
+                std::string xj_key = std::format("P{}", xi.route.back().second);
+                axi_key = this->add_step(axi_key, xj_key, 'x');
+            }
         }
     } 
     else
@@ -397,6 +403,7 @@ void EvalStep::print_step()
     for(step s: this->eval_step)
     {
         this->print_line(s, count);
+        ++count;
     }
 }
 

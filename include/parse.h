@@ -13,7 +13,7 @@
 #include "polyEval_class.h"
 #include "error_bound.h"
 
-std::vector<std::vector<double>> parse_remez_coeff(int p_num, int e_num, bool print = false);
+std::vector<std::vector<double>> parse_remez_coeff(int p_num, int e_num, std::string critieria, bool print = false);
 int calcuate_remez_depth(std::vector<std::vector<double>> coeffs);
 
 nlohmann::json load_decomp_cache(const std::string& filename);

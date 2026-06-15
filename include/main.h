@@ -4,12 +4,18 @@
 #include "evaluate.h"
 #include "measure_time.h"
 #include "error_bound.h"
+#include "fakeciphertext.h"
 #include "polyEval_class.h"
 #include "parse.h"
 #include "math.h"
 
 #include <format>
 
+const int N_num = 17;
+const size_t hwt = 128;
+const int N = pow(2, N_num);
+const double sigma = 3.1;
+const double interval_size = 1.0 / 16384.0;
 
 inline std::map<int, std::map<int, std::pair<int,int>>> required_iter_HELUT = {
     {35, {
@@ -34,14 +40,14 @@ inline std::map<int, std::map<int, std::pair<int,int>>> required_iter_HELUT = {
 
 inline map<int, map<int, int>> required_depth_REMEZ = {
     {35, {
-        {2, 99}, {3, 99}, {4, 99}, {5, 99}, {6, 99}
+        {2, 7}, {3, 9}, {4, 11}, {5, 12}, {6, 14}
     }},
     {50, {
-        {{2, 8}, {3, 9}, {4, 11}, {5, 13}, {6, 14}, {7, 15}, {8, 16}, {9, 19}, {10, 20}}
+        {2, 8}, {3, 9}, {4, 11}, {5, 13}, {6, 14}, {7, 15}, {8, 16}, {9, 19}, {10, 20}
     }}
 };
 
-std::unique_ptr<CKKS_params> set_test_params(int p_num, int s_num, int e_num, int N, size_t hwt, bool test_helut, bool test_remez, int depth=0)
+std::unique_ptr<CKKS_params> set_test_params(int p_num, int s_num, int e_num, int N, size_t hwt, bool test_helut, bool test_remez, bool print_params=true)
 {
     //필요한 깊이 계산
     int helut_level = 0, remez_level = 0;
@@ -53,16 +59,19 @@ std::unique_ptr<CKKS_params> set_test_params(int p_num, int s_num, int e_num, in
     }
     if(test_remez)
     {
-        remez_level = depth;
+        remez_level = required_depth_REMEZ.at(s_num).at(p_num);
     }
     int req_depth = helut_level > remez_level ? helut_level : remez_level;
 
     //파라미터 정보 출력
-    std::cout << "| Interval p:\t2^" << p_num << std::endl;
-    std::cout << "| Precision e:\t2^-" << e_num << std::endl;
-    std::cout << "| Scale s:\t2^" << s_num << std::endl;
-    std::cout << "| Depth:\t" << req_depth << std::endl;
-    std::cout << "------------\n";
+    if(print_params)
+    {
+        std::cout << "| Interval p:\t2^" << p_num << std::endl;
+        std::cout << "| Precision e:\t2^-" << e_num << std::endl;
+        std::cout << "| Scale s:\t2^" << s_num << std::endl;
+        std::cout << "| Depth:\t" << req_depth << std::endl;
+        std::cout << "------------\n";
+    }
 
     // Modulus chain.
     vector<int> modulus = {60};
@@ -76,11 +85,11 @@ std::unique_ptr<CKKS_params> set_test_params(int p_num, int s_num, int e_num, in
 std::unique_ptr<CKKS_params> set_test_params(int p_num, int s_num, int e_num, int N, size_t hwt, int req_depth)
 {
     //파라미터 정보 출력
-    std::cout << "| Interval p:\t2^" << p_num << std::endl;
-    std::cout << "| Precision e:\t2^-" << e_num << std::endl;
-    std::cout << "| Scale s:\t2^" << s_num << std::endl;
-    std::cout << "| Depth:\t" << req_depth << std::endl;
-    std::cout << "------------\n";
+    // std::cout << "| Interval p:\t2^" << p_num << std::endl;
+    // std::cout << "| Precision e:\t2^-" << e_num << std::endl;
+    // std::cout << "| Scale s:\t2^" << s_num << std::endl;
+    // std::cout << "| Depth:\t" << req_depth << std::endl;
+    // std::cout << "------------\n";
 
     // Modulus chain.
     vector<int> modulus = {60};
@@ -110,7 +119,84 @@ std::vector<double> generate_points(std::pair<double, double> interval, int coun
     return p;
 }
 
+void margin_test(int start, int end, bool usefile, int s_num, int e_num, bool test_boundary=false)
+{
+    std::ofstream ofs;
+    std::streambuf* old_buf = nullptr;
+    if (usefile)
+    {
+        ofs.open(std::format("margin_test_{}.txt", e_num));
+        old_buf = std::cout.rdbuf(ofs.rdbuf());
+    }
 
+    ErrBound eb(sigma, N, hwt, s_num);
+    vector<std::shared_ptr<Decomp>> dcmps;
+    json decomp_cache = load_decomp_cache("data/decomp_cache.json");
+
+    for(int p_num=start; p_num<=end; p_num++)
+    {
+        vector<vector<double>> coeffs = parse_remez_coeff(p_num, e_num, "depth");
+        int depth = calcuate_remez_depth(coeffs);
+        std::unique_ptr<CKKS_params> pms = set_test_params(p_num, s_num, e_num, N_num, hwt, depth);
+        
+        // 기본 평문 데이터 설정
+        // 각 x값을 최대로 삽입.
+        int n_value = pow(2, N_num);
+        int p_value = pow(2, p_num);
+        std::vector<double> x;
+        x.reserve(n_value / 2);
+        int copy_count = x.capacity();
+        std::vector<double> margins(p_value);
+        double err = eb.Bc / eb.scale;
+        
+        // 0부터 p_value-1까지의 값을 각각 테스트
+        std::vector<int> test_values;
+        if (test_boundary) {
+            test_values.push_back(0);
+            test_values.push_back(1);
+            test_values.push_back(p_value - 1);
+        } else {
+            for (int i = 0; i < p_value; i++) {
+                test_values.push_back(i);
+            }
+        }
+        for(int i: test_values)
+        {
+            x.assign(x.capacity(), static_cast<double>(i));
+            seal::Ciphertext ctx = pms->encrypt(x);
+
+
+            // 각 다항식에 대해 평가
+            std::vector<double> res_pt = x;
+            seal::Ciphertext res_ct = ctx;
+            std::pair<double, double> res_interval = {i - err, i + err};
+            bool use_lipschitz = true;
+
+            for(int index=0; index < coeffs.size(); index++)
+            {
+                std::cout << std::format("COEFF {} / {}", index+1, coeffs.size()) << std::endl;
+                vector<double> coeff = coeffs[index];
+                string key = get_poly_type_key(coeff);
+                shared_ptr<Decomp> dcmp = reconstruct_decomp_from_cache(decomp_cache.at(key), coeff);
+                dcmps.push_back(dcmp);
+                EvalStep es(dcmp);
+
+                // pt, ct, fct 각각 평가
+                res_pt = pt::evaluate(coeff, res_pt);
+                res_ct = ct::evaluate(res_ct, es, *pms);
+                res_interval = fct::estimate_range(eb, res_interval, es, interval_size, use_lipschitz);
+                use_lipschitz = false; // Lipschitz는 첫 단계에서만 적용
+                compare_boundary(res_pt, res_ct, res_interval, *pms, copy_count);
+            }
+            std::cout << std::format("x={}\t", i);
+            double x_margin = compare_precision(res_pt, res_ct, res_interval, *pms, copy_count);
+            margins[i] = x_margin;
+        }
+        std::cout << std::format("Maximum margin[0] for PNUM={}: {}", p_num, clearNum(margins[0])) << std::endl;
+        std::cout << std::format("Maximum margin[1:] for PNUM={}: {}", p_num, clearNum(*std::max_element(margins.begin()+1, margins.end()))) << std::endl;
+        std::cout << "#####################################" << std::endl;
+    }
+}
 // 분해식 정보 기반 가암호문 평가
 /* fct::Ciphertext eval_poly_fct(shared_ptr<Decomp> dcmp, fct::Ciphertext& fct, ErrBound& eb)
 {

@@ -50,6 +50,7 @@ pybind11_add_module(${MY_MODULE}
     src/bindings.cpp
     src/parse.cpp
     src/error_bound.cpp
+    src/fakeciphertext.cpp
     src/polyEval_class.cpp
 )
 

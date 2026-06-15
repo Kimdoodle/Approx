@@ -58,7 +58,7 @@ std::vector<double> pt::add_plain(const std::vector<double>& a, double scalar)
     return res;
 }
 
-std::vector<double> pt::eval(const std::vector<double>& coeff, const std::vector<double>& x)
+std::vector<double> pt::evaluate(const std::vector<double>& coeff, const std::vector<double>& x)
 {
     std::vector<double> res(x.size(), 0.0);
 

@@ -12,5 +12,5 @@ namespace pt
     std::vector<double> sub(const std::vector<double>& a, const std::vector<double>& b);
     std::vector<double> mult_plain(const std::vector<double>& a, double scalar);
     std::vector<double> add_plain(const std::vector<double>& a, double scalar);
-    std::vector<double> eval(const std::vector<double>& coeff, const std::vector<double>& x);
+    std::vector<double> evaluate(const std::vector<double>& coeff, const std::vector<double>& x);
 }

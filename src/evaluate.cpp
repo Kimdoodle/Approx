@@ -66,12 +66,14 @@ void evaluate_helut(CKKS_params& pms, vector<double>& x, bool test_time)
         pms.add_pt_ct_inplace(pt, ct);
         
         // x^2(-2x+3)
-        pms.eva->mod_reduce_to_next_inplace(ct);
+        // pms.eva->mod_reduce_to_next_inplace(ct);
+        pt = pms.encode(1.0, ct);
+        pms.mult_pt_ct_inplace(pt, ct, true);
         pms.mult_ct_ct_inplace(ct, ct2);
 
         if(!test_time)
         {
-            real_result = pt::eval(coeff_cleanse, real_result);
+            real_result = pt::evaluate(coeff_cleanse, real_result);
             ckks_result = pms.decode_ctxt(ct);
             std::cout << "Cleanse " << i+1 << std::endl;
             // compare_result_pt(ckks_result, real_result, x.size());
@@ -138,7 +140,7 @@ void evaluate_multi_remez(CKKS_params& pms, vector<double>& x, std::vector<std::
         //print
         if(!test_time)
         {
-            real_result = pt::eval(dcmp->coeff, real_result);
+            real_result = pt::evaluate(dcmp->coeff, real_result);
             ckks_result = pms.decode_ctxt(ct);
             // compare_result_pt(ckks_result, real_result, x.size());
             // compare_result_IF(ckks_result, x.size());
@@ -735,7 +737,7 @@ std::vector<double> linspace(double a, double b, std::size_t n) {
 */
 
 // 분해식 정보 기반 암호문 평가
-CT eval_poly_ct(CKKS_params& pms, shared_ptr<Decomp> dcmp, CT x, ErrBound& eb, int copy_count, bool step_debug, bool res_debug)
+/* CT eval_poly_ct(CKKS_params& pms, shared_ptr<Decomp> dcmp, CT x, ErrBound& eb, int copy_count, bool step_debug, bool res_debug)
 {
     EvalStep es(dcmp);
     // es.print_step();
@@ -763,28 +765,28 @@ CT eval_poly_ct(CKKS_params& pms, shared_ptr<Decomp> dcmp, CT x, ErrBound& eb, i
     fpowers.insert_or_assign("P1", fctx);
     fct::Ciphertext fvalue1, fvalue2, fadd_res, fmult_res;
     
-/*     // Correction factor 연산
-    double correction_factor = 1.0;
-    int required_depth = ceil(log2((int)dcmp->coeff.size()));
-    const auto& coeff_modulus = pms.context->get_context_data(ctx.parms_id())->parms().coeff_modulus();
+    // // Correction factor 연산
+    // double correction_factor = 1.0;
+    // int required_depth = ceil(log2((int)dcmp->coeff.size()));
+    // const auto& coeff_modulus = pms.context->get_context_data(ctx.parms_id())->parms().coeff_modulus();
 
-    int mod_index = ctx.coeff_modulus_size() - 1;
-    double previous_scale = ctx.scale();
-    double next_scale;
-    for(int i=0; i<required_depth; ++i)
-    {
-        next_scale = (previous_scale * previous_scale) / coeff_modulus[mod_index--].value();
-        correction_factor = next_scale / previous_scale;
-    }
+    // int mod_index = ctx.coeff_modulus_size() - 1;
+    // double previous_scale = ctx.scale();
+    // double next_scale;
+    // for(int i=0; i<required_depth; ++i)
+    // {
+    //     next_scale = (previous_scale * previous_scale) / coeff_modulus[mod_index--].value();
+    //     correction_factor = next_scale / previous_scale;
+    // }
 
-    int apply_index = 0;
-    for(int i=0; i<es.eval_step.size()-1; i++)
-    {
-        auto step = es.eval_step[i];
-        auto nstep = es.eval_step[i+1];
-        if(step.op == 'o' && nstep.op == 'x')
-            apply_index = i;
-    } */
+    // int apply_index = 0;
+    // for(int i=0; i<es.eval_step.size()-1; i++)
+    // {
+    //     auto step = es.eval_step[i];
+    //     auto nstep = es.eval_step[i+1];
+    //     if(step.op == 'o' && nstep.op == 'x')
+    //         apply_index = i;
+    // }
 
     // 평가
     int step_count = 0;
@@ -962,10 +964,136 @@ CT eval_poly_ct(CKKS_params& pms, shared_ptr<Decomp> dcmp, CT x, ErrBound& eb, i
         compare_boundary(step_res, pms, copy_count);
     }
     return step_res;
+} */
+
+// 분해식 정보 기반 seal::Ciphertext 평가
+
+seal::Ciphertext ct::evaluate(seal::Ciphertext& x, EvalStep es, CKKS_params& pms)
+{
+    //seal::Ciphertext datas
+    seal::Ciphertext ctx = x;
+    std::map<std::string, double> coeffs;
+    std::map<std::string, seal::Ciphertext> cpowers;
+    std::map<std::string, seal::Ciphertext> cterms;
+    cpowers.insert_or_assign("P1", ctx); // Assert P1
+    seal::Ciphertext cvalue1, cvalue2, cadd_res, cmult_res;
+    seal::Plaintext pt;
+
+    // 평가
+    int step_count = 0;
+    seal::Ciphertext step_res;
+    for(auto step: es.eval_step)
+    {
+        switch(step.op)
+        {
+            case 'o':
+                if(step.key1[0] != 'C')
+                {
+                    if(step.key1[0] == 'P')
+                        continue;
+                    throw std::invalid_argument(std::format("Main::RES: invalid key data {} {}", step.key1, step.key2));
+                }
+                coeffs.insert_or_assign(step.key1, std::stod(step.key2));
+                break;
+            case '+':
+                if(step.key1[0] == 'T' && step.key2[0] == 'C')
+                {
+                    cvalue1 = cterms.at(step.key1);
+                    pt = pms.encode(coeffs.at(step.key2), cvalue1);
+                    pms.add_pt_ct(pt, cvalue1, cadd_res);
+                }
+                else if(step.key1[0] == 'T' && step.key2[0] == 'T')
+                {
+                    cvalue1 = cterms.at(step.key1);
+                    cvalue2 = cterms.at(step.key2);
+                    pms.add_ct_ct(cvalue1, cvalue2, cadd_res);
+                }
+                else if(step.key1[0] == 'P' && step.key2[0] == 'C')
+                {
+                    cvalue1 = cpowers.at(step.key1);
+                    pt = pms.encode(coeffs.at(step.key2), cvalue1);
+                    pms.add_pt_ct(pt, cvalue1, cadd_res);
+                }
+                else if(step.key1[0] == 'P' && step.key2[0] == 'T')
+                {
+                    cvalue1 = cpowers.at(step.key1);
+                    cvalue2 = cterms.at(step.key2);
+                    pms.add_ct_ct(cvalue1, cvalue2, cadd_res);
+                }
+                else
+                {
+                    throw std::invalid_argument(std::format("Main::ADD: invalid key data {} {}", step.key1, step.key2));
+                }
+                cterms.insert_or_assign(step.save_key, cadd_res);
+                step_res = cadd_res;
+                break;
+
+            case 'x':
+                if(step.key1[0] == 'P' && step.key2[0] == 'P')
+                {
+                    cvalue1 = cpowers.at(step.key1);
+                    cvalue2 = cpowers.at(step.key2);
+                    pms.mult_ct_ct(cvalue1, cvalue2, cmult_res);
+                }
+                else if(step.key1[0] == 'C' && step.key2[0] == 'P')
+                {
+                    double coeff = coeffs.at(step.key1);
+                    cvalue1 = cpowers.at(step.key2);
+                    pt = pms.encode(coeff, cvalue1);
+                    pms.mult_pt_ct(pt, cvalue1, cmult_res, true);
+                }
+                else if(step.key1[0] == 'P' && step.key2[0] == 'C')
+                {
+                    cvalue1 = cpowers.at(step.key1);
+                    double coeff = coeffs.at(step.key2);
+                    pt = pms.encode(coeff, cvalue1);
+                    pms.mult_pt_ct(pt, cvalue1, cmult_res, true);
+                }
+                else if(step.key1[0] == 'P' && step.key2[0] == 'T')
+                {
+                    cvalue1 = cpowers.at(step.key1);
+                    cvalue2 = cterms.at(step.key2);
+                    pms.mult_ct_ct(cvalue1, cvalue2, cmult_res);
+                }
+                else if(step.key1[0] == 'T' && step.key2[0] == 'T')
+                {
+                    cvalue1 = cterms.at(step.key1);
+                    cvalue2 = cterms.at(step.key2);
+                    pms.mult_ct_ct(cvalue1, cvalue2, cmult_res);
+                }
+                else if(step.key1[0] == 'T' && step.key2[0] == 'P')
+                {
+                    cvalue1 = cterms.at(step.key1);
+                    cvalue2 = cpowers.at(step.key2);
+                    pms.mult_ct_ct(cvalue1, cvalue2, cmult_res);
+                }
+                else
+                {
+                    throw std::invalid_argument(std::format("Main::MUL: invalid key data {} {}", step.key1, step.key2));
+                }
+                switch(step.save_key[0])
+                {
+                    case 'P':
+                        cpowers.insert_or_assign(step.save_key, cmult_res);
+                        break;
+                    case 'T':
+                        cterms.insert_or_assign(step.save_key, cmult_res);
+                        break;
+                    default:
+                        break;
+                }
+                step_res = cmult_res;
+                break;
+            default:
+                break;
+        }
+        step_count++;
+    }
+    return step_res;
 }
 
 // Cleanse함수 평가
-CT eval_poly_cl(CKKS_params& pms, CT x, ErrBound& eb, int copy_count, bool step_debug, bool res_debug)
+/* CT eval_poly_cl(CKKS_params& pms, CT x, ErrBound& eb, int copy_count, bool step_debug, bool res_debug)
 {
     //plain value
     std::map<std::string, double> coeffs;
@@ -1039,77 +1167,106 @@ CT eval_poly_cl(CKKS_params& pms, CT x, ErrBound& eb, int copy_count, bool step_
     }
     return res;
 }
+ */
+
 
 // 비교용
-void compare_boundary(CT res, CKKS_params& pms, int copy_count)
+void compare_boundary(std::vector<double> ptx, seal::Ciphertext ctx, std::pair<double, double> fct_interval, CKKS_params& pms, int copy_count)
 {            
-    /*
-        출력해야할 내용
-        1. x^2값
-        2. 하한값(fct - ct)의 비트 수 차이
-        3. 상한값(fct - ct)의 비트 수 차이
-    */
-    double scale = pms.scale;
-    std::vector<double> pt_res = std::get<0>(res);
-    seal::Ciphertext ct_res = std::get<1>(res);
-    fct::Ciphertext fct_res = std::get<2>(res);
-    auto [fct_high, fct_low] = fct::dec(fct_res);
-
-    std::vector<double> ct_res_dcd = pms.decode_ctxt(ct_res); // 3, 4
-
-    for(int i=0; i<ct_res_dcd.size()/copy_count; i++)
-    {
-        int start_idx = i*copy_count;
-        double ptx = pt_res[start_idx]; // 1
-        double fct_max = fct_high[start_idx]; // 2
-        double fct_min = fct_low[start_idx]; // 2
-        double abs_sum = 0.0; // 3
-        double ct_max = ct_res_dcd[start_idx];
-        double ct_min = ct_res_dcd[start_idx];
-
-        for(int j=0; j<copy_count; j++)
-        {
-            int idx = i*copy_count + j;
-            fct_max = std::max(fct_max, fct_high[idx]);
-            fct_min = std::min(fct_min, fct_low[idx]);
-            abs_sum += ct_res_dcd[idx];
-            ct_max = std::max(ct_max, ct_res_dcd[idx]);
-            ct_min = std::min(ct_min, ct_res_dcd[idx]);
-        }
-        double abs_avg = abs_sum / copy_count;
-        bool res = fct_min <= ct_min && ct_max <= fct_max;
-        std::string correctness = res ? "PASS" : "FAIL";
-        std::cout
-            << std::format("{}(x={})\n", correctness, i)
-            << std::format("\tAnswer = {}\n", clearNum(ptx))
-            << std::format("\tct data high= {}\n", clearNum(ct_max))
-            << std::format("\tct data low= {}\n", clearNum(ct_min))
-            << std::format("\tLowest boundary {}\n", clearNum(fct_min))
-            << std::format("\tHighest boundary {}\n", clearNum(fct_max));
-            // << std::format("\tLowest boundary {}\n", bit_diff(fct_min, ct_min))
-            // << std::format("\tHighest boundary {}\n", bit_diff(fct_max, ct_max));
-    }
-}
-
-void compare_precision(CT res, CKKS_params& pms, int copy_count)
-{
-    std::vector<double> ptx = std::get<0>(res);
-    seal::Ciphertext ctx = std::get<1>(res);
-    fct::Ciphertext fctx = std::get<2>(res);
 
     std::vector<double> pt_res = ptx;
     std::vector<double> ct_res = pms.decode_ctxt(ctx);
-    auto [fct_res_high, fct_res_low] = fct::dec(fctx);
+    double fct_low = fct_interval.first;
+    double fct_high = fct_interval.second;
+
+    bool boundary_flag;
+
+    int answer = std::round(pt_res[0]);
+    double ct_high = *std::max_element(ct_res.begin(), ct_res.end());
+    double ct_low = *std::min_element(ct_res.begin(), ct_res.end());
+
+    // Boundary check
+    boundary_flag = fct_low <= ct_low && ct_high <= fct_high ? true : false;
+
+    // print result
+    if(!boundary_flag)
+    {
+        std::cout 
+            << std::format("Boundary FAIL in x={}\n", 0)
+            << std::format("\tAnswer\t{}\n", clearNum(answer))
+            << std::format("\tHigh boundary\t{}\n", clearNum(fct_high))
+            << std::format("\tDecrypt result high\t{}\n", clearNum(ct_high))
+            << std::format("\tDecrypt result low\t{}\n", clearNum(ct_low))
+            << std::format("\tLow boundary\t{}\n", clearNum(fct_low));
+    }
+    if(boundary_flag)
+    {
+        double margin = std::max(std::abs(fct_high - ct_high), std::abs(fct_low - ct_low));
+        std::cout << std::format("Boundary PASS. margin: {}", clearNum(margin)) << std::endl;
+    }
+}
+
+// Assume all data are target to equal value.
+double compare_precision(std::vector<double> ptx, seal::Ciphertext ctx, std::pair<double, double> fct_interval, CKKS_params& pms, int copy_count)
+{
+    std::vector<double> pt_res = ptx;
+    std::vector<double> ct_res = pms.decode_ctxt(ctx);
+    double fct_low = fct_interval.first;
+    double fct_high = fct_interval.second;
 
     // 최종 결과 비교 - 목표 정밀도에 부합하는가?
     double precision = pms.target_precision;
     bool boundary_flag, precision_flag;
-    bool final_flag = true;
-    for(int i=0; i<ptx.size() / copy_count; i++)
+
+    int answer = std::round(pt_res[0]);
+    // double fct_high = *std::max_element(fct_res_high.begin(), fct_res_high.end());
+    double ct_high = *std::max_element(ct_res.begin(), ct_res.end());
+    double ct_low = *std::min_element(ct_res.begin(), ct_res.end());
+    // double fct_low = *std::min_element(fct_res_low.begin(), fct_res_low.end());
+
+    // Boundary check
+    boundary_flag = fct_low <= ct_low && ct_high <= fct_high ? true : false;
+    // Precision check
+    double diff = std::max(std::abs(ct_high - answer), std::abs(answer - ct_low));
+    precision_flag = diff <= precision ? true : false;
+
+    // print result
+    if(!boundary_flag && !precision_flag)
+    {
+        std::cout 
+            << std::format("Boundary FAIL and Precision FAIL in x={}\n", 0)
+            << std::format("\tAnswer\t{}\n", clearNum(answer))
+            << std::format("\tHigh boundary\t{}\n", clearNum(fct_high))
+            << std::format("\tDecrypt result high\t{}\n", clearNum(ct_high))
+            << std::format("\tDecrypt result low\t{}\n", clearNum(ct_low))
+            << std::format("\tLow boundary\t{}\n", clearNum(fct_low));
+    }
+    else if(!boundary_flag && precision_flag)
+    {
+        std::cout
+            << std::format("Boundary FAIL, but Precision acheived in x={}\n", 0)
+            << std::format("\tAnswer\t{}\n", clearNum(answer))
+            << std::format("\tHigh boundary\t{}\n", clearNum(fct_high))
+            << std::format("\tDecrypt result high\t{}\n", clearNum(ct_high))
+            << std::format("\tDecrypt result low\t{}\n", clearNum(ct_low))
+            << std::format("\tLow boundary\t{}\n", clearNum(fct_low));
+    }
+    else if(boundary_flag && !precision_flag)
+    {
+        std::cout
+            << std::format("Boundary PASS, but Precision failed in x={}\n", 0)
+            << std::format("\tAnswer\t{}\n", clearNum(answer))
+            << std::format("\tHigh boundary\t{}\n", clearNum(fct_high))
+            << std::format("\tDecrypt result high\t{}\n", clearNum(ct_high))
+            << std::format("\tDecrypt result low\t{}\n", clearNum(ct_low))
+            << std::format("\tLow boundary\t{}\n", clearNum(fct_low));
+    }
+
+    /* for(int i=0; i<ptx.size() / copy_count; i++)
     {
         boundary_flag = true;
         precision_flag = true;
-        double pt_target = (i == 0) ? 1.0 : 0.0;
+        double pt_target = (ptx[i] == 0) ? 1.0 : 0.0;
 
         for(int j=0; j<copy_count; j++)
         {
@@ -1165,10 +1322,21 @@ void compare_precision(CT res, CKKS_params& pms, int copy_count)
                     << std::format("\tDecrypt result\t{}\n", clearNum(dec_value))
                     << std::format("\tHigh boundary\t{}\n", clearNum(high));
             }
-        }
+            else 
+            {
+                max_margin = std::max(max_margin, diff);
+            }
+        } */
+    
+    if(boundary_flag && precision_flag)
+    {
+        double margin = std::max(std::abs(fct_high - ct_high), std::abs(fct_low - ct_low));
+        std::cout << std::format("All result PASS. margin: {}", clearNum(margin)) << std::endl;
+        // std::cout << std::format("\t{} < {}", clearNum(ct_high), clearNum(fct_high)) << std::endl;
+        // std::cout << std::format("\t{} < {}", clearNum(fct_low), clearNum(ct_low)) << std::endl;
+        return margin;
     }
-    if(final_flag)
-        std::cout << "All result PASS.\n" << std::endl;
+    return -99;
 }
 
 // Compare result of ciphertext with plaintext value.
